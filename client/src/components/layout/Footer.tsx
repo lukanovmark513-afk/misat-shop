@@ -85,7 +85,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 pt-8 mb-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-3">
             <p className="text-xs text-gray-600">
-              ИП MISAT | ИНН: 673111219228 | ОГРНИП: 323456789012345
+              ИП MISAT | ИНН: 673111219228
             </p>
             <p className="text-xs text-gray-600">
               Режим налогообложения: Самозанятый

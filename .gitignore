@@ -1,6 +1,40 @@
+# Зависимости
 node_modules/
-dist/
+client/node_modules/
+server/node_modules/
+
+# Файлы окружения (важно!)
 .env
+.env.local
+.env.*.local
+client/.env
+server/.env
+
+# Логи и временные файлы
 *.log
-uploads/
-docker/postgres_data/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# IDE (для PyCharm/VS Code)
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Сборки (они генерируются на сервере, не нужны в гите)
+client/dist/
+server/dist/
+
+# База данных (SQLite)
+server/database.sqlite
+server/*.sqlite
+server/*.sqlite-journal
+
+# Временные файлы
+*.tmp
+temp/
