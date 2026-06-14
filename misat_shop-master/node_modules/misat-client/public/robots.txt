@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Sitemap: https://misat.com/sitemap.xml
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /profile/
