@@ -1,3 +1,62 @@
-﻿*.env
+﻿# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Production
+build/
+dist/
+.serverless/
+
+# Database
+*.sqlite
+*.sqlite-journal
+server/src/database.sqlite
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
 .idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Uploads
+uploads/
+server/uploads/
+
+# Misc
+*.log
+coverage/
+.nyc_output/
+
+# TypeScript compiled (если есть)
+server/dist/
+client/dist/
