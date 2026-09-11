@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { productsAPI } from '../../services/api';
+import { processImageWithAI } from '../utils/aiImageProcessor';
 
 interface Product {
   id: number;
@@ -129,53 +130,43 @@ const AdminProducts = () => {
     loadProducts();
   }, []);
 
-  const compressImage = (file: File, maxSizeMB: number = 0.5): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxWidth = 500;
-          const maxHeight = 500;
+    const compressImage = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 4096; // 4K
 
-          if (width > height) {
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
+            let width = img.width;
+            let height = img.height;
+
+            // Если фото меньше 4096 — увеличиваем до 4096 по большей стороне
+            if (width < MAX_SIZE && height < MAX_SIZE) {
+              const scale = MAX_SIZE / Math.max(width, height);
+              width = Math.round(width * scale);
+              height = Math.round(height * scale);
             }
-          } else {
-            if (height > maxHeight) {
-              width = (width * maxHeight) / height;
-              height = maxHeight;
-            }
-          }
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d')!;
 
-          let quality = 0.5;
-          let result = canvas.toDataURL('image/jpeg', quality);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
 
-          while (result.length > maxSizeMB * 1024 * 1024 && quality > 0.3) {
-            quality -= 0.1;
-            result = canvas.toDataURL('image/jpeg', quality);
-          }
-
-          resolve(result);
+            // JPEG 100% качество
+            resolve(canvas.toDataURL('image/jpeg', 1.0));
+          };
+          img.onerror = reject;
+          img.src = e.target?.result as string;
         };
-        img.onerror = reject;
-      };
-      reader.onerror = reject;
-    });
-  };
-
+        reader.onerror = reject;
+      });
+    };
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -192,12 +183,12 @@ const AdminProducts = () => {
       const newImages: string[] = [];
 
       for (const file of files) {
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error(`Файл ${file.name} слишком большой. Максимум 5MB`);
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error(`Файл ${file.name} слишком большой. Максимум 20MB`);
           continue;
         }
 
-        const compressed = await compressImage(file, 0.5);
+        const compressed = await compressImage(file);
         newImages.push(compressed);
       }
 
@@ -214,7 +205,6 @@ const AdminProducts = () => {
     setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
 
-  // Перемещение фото вверх
   const moveImageUp = (index: number) => {
     if (index === 0) return;
     const newImages = [...imagePreviews];
@@ -222,7 +212,6 @@ const AdminProducts = () => {
     setImagePreviews(newImages);
   };
 
-  // Перемещение фото вниз
   const moveImageDown = (index: number) => {
     if (index === imagePreviews.length - 1) return;
     const newImages = [...imagePreviews];
@@ -476,7 +465,7 @@ const AdminProducts = () => {
                       <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 object-cover rounded" />
                     </td>
                     <td className="px-4 py-3 font-medium">{product.name}</td>
-                    <td className="px-4 py-3">{product.price.toLocaleString()} ₽} </td>
+                    <td className="px-4 py-3">{product.price.toLocaleString()} ₽</td>
                     <td className="px-4 py-3">
                       {product.stockType === 'in_stock' ? (
                         <span className="text-green-600 text-xs font-bold">✅ В наличии</span>
@@ -502,7 +491,6 @@ const AdminProducts = () => {
         </div>
       )}
 
-      {/* Модальное окно */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -512,27 +500,25 @@ const AdminProducts = () => {
             </div>
             <div className="p-4 md:p-6">
 
-              {/* Фото товара с кнопками управления */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Фото товара *</label>
                 <div className="flex flex-wrap gap-3 mb-3">
                   {imagePreviews.map((img, idx) => (
-                    <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200">
-                      <img src={img} alt={`Фото ${idx + 1}`} className="w-full h-full object-cover" />
-
-                      {/* Номер фото */}
+                    <div key={idx} className="relative w-28 h-28 bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200">
+                      <img
+                        src={img}
+                        alt={`Фото ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                       <div className="absolute top-0 left-0 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-br">
                         {idx + 1}
                       </div>
-
-                      {/* Кнопки управления порядком */}
                       <div className="absolute bottom-1 right-1 flex gap-1">
                         {idx > 0 && (
                           <button
                             type="button"
                             onClick={() => moveImageUp(idx)}
                             className="w-5 h-5 bg-black/60 rounded text-white text-[10px] hover:bg-black/80 transition"
-                            title="Переместить вверх"
                           >
                             ↑
                           </button>
@@ -542,14 +528,11 @@ const AdminProducts = () => {
                             type="button"
                             onClick={() => moveImageDown(idx)}
                             className="w-5 h-5 bg-black/60 rounded text-white text-[10px] hover:bg-black/80 transition"
-                            title="Переместить вниз"
                           >
                             ↓
                           </button>
                         )}
                       </div>
-
-                      {/* Кнопка удаления */}
                       <button
                         type="button"
                         onClick={() => removeImage(idx)}
@@ -560,7 +543,7 @@ const AdminProducts = () => {
                     </div>
                   ))}
 
-                  <label className="cursor-pointer w-24 h-24 bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-gray-200 transition border-2 border-dashed border-gray-300">
+                  <label className="cursor-pointer w-28 h-28 bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-gray-200 transition border-2 border-dashed border-gray-300">
                     {isUploading ? (
                       <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                     ) : (
@@ -572,19 +555,15 @@ const AdminProducts = () => {
                     <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={isUploading} />
                   </label>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  🔧 Используйте кнопки ↑ ↓ для изменения порядка. Первое фото будет на витрине.
-                </p>
+                <p className="text-xs text-gray-400 mt-2">🔧 Используйте кнопки ↑ ↓ для изменения порядка.</p>
                 {imagePreviews.length === 0 && !editingProduct && <p className="text-xs text-red-500 mt-1">Загрузите хотя бы одно фото</p>}
               </div>
 
-              {/* Название */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Название *</label>
                 <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="Введите название товара" />
               </div>
 
-              {/* Цена */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-bold mb-2">Цена *</label>
@@ -596,7 +575,6 @@ const AdminProducts = () => {
                 </div>
               </div>
 
-              {/* Категория и остаток */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-bold mb-2">Категория</label>
@@ -610,24 +588,20 @@ const AdminProducts = () => {
                 </div>
               </div>
 
-              {/* Тип товара */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Тип товара</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2">
                     <input type="radio" name="stockType" value="in_stock" checked={formData.stockType === 'in_stock'} onChange={() => setFormData({ ...formData, stockType: 'in_stock' })} />
                     <span>В наличии (РФ)</span>
-                    <span className="text-xs text-green-600 ml-2">доставка 2-5 дней</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input type="radio" name="stockType" value="preorder" checked={formData.stockType === 'preorder'} onChange={() => setFormData({ ...formData, stockType: 'preorder' })} />
                     <span>Предзаказ (Китай)</span>
-                    <span className="text-xs text-orange-600 ml-2">доставка 20-35 дней</span>
                   </label>
                 </div>
               </div>
 
-              {/* Срок предзаказа */}
               {formData.stockType === 'preorder' && (
                 <div className="mb-4">
                   <label className="block text-sm font-bold mb-2">Срок предзаказа (дней)</label>
@@ -641,31 +615,25 @@ const AdminProducts = () => {
                 </div>
               )}
 
-              {/* Процент предоплаты */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Предоплата</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2">
                     <input type="radio" name="prepaymentPercent" value="100" checked={formData.prepaymentPercent === 100} onChange={() => setFormData({ ...formData, prepaymentPercent: 100 })} />
-                    <span>100% предоплата</span>
-                    <span className="text-xs text-orange-600 ml-2">(рекомендуется для предзаказа)</span>
+                    <span>100%</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input type="radio" name="prepaymentPercent" value="70" checked={formData.prepaymentPercent === 70} onChange={() => setFormData({ ...formData, prepaymentPercent: 70 })} />
-                    <span>70% предоплата, 30% при получении</span>
-                    <span className="text-xs text-green-600 ml-2">(для товаров в наличии)</span>
+                    <span>70%</span>
                   </label>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">При отказе от заказа предоплата не возвращается</p>
               </div>
 
-              {/* Описание */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Описание</label>
                 <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} className="w-full px-3 py-2 border rounded-lg resize-none" placeholder="Описание товара" />
               </div>
 
-              {/* Размеры */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Размеры *</label>
                 <div className="flex flex-wrap gap-2">
@@ -687,7 +655,6 @@ const AdminProducts = () => {
                 {formData.sizes.length === 0 && <p className="text-xs text-red-500 mt-1">Выберите хотя бы один размер</p>}
               </div>
 
-              {/* Цвета */}
               <div className="mb-4">
                 <label className="block text-sm font-bold mb-2">Цвета</label>
                 <div className="flex flex-wrap gap-2">
@@ -708,7 +675,6 @@ const AdminProducts = () => {
                 </div>
               </div>
 
-              {/* Чекбоксы */}
               <div className="flex flex-wrap gap-4 mb-6">
                 <label className="flex items-center gap-2">
                   <input type="checkbox" checked={formData.isNew} onChange={(e) => setFormData({ ...formData, isNew: e.target.checked })} />

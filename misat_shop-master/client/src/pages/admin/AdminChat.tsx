@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 
@@ -143,7 +143,6 @@ const AdminChat = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white">ЧАТ С КЛИЕНТАМИ</h1>
         <div className="flex items-center gap-2 mt-2">
@@ -212,7 +211,6 @@ const AdminChat = () => {
         <div className="flex-1 flex flex-col">
           {selectedUser ? (
             <>
-              {/* Заголовок чата */}
               <div className="p-4 border-b border-white/10 bg-white/5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white">
@@ -225,7 +223,6 @@ const AdminChat = () => {
                 </div>
               </div>
 
-              {/* Сообщения */}
               <div className="flex-1 overflow-y-auto p-4 bg-black/30 flex flex-col gap-3 custom-scrollbar">
                 {selectedUser.messages.length === 0 ? (
                   <div className="text-center py-12">
@@ -262,7 +259,6 @@ const AdminChat = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Поле ввода */}
               <div className="p-4 border-t border-white/10 flex gap-2 bg-white/5">
                 <input
                   type="text"

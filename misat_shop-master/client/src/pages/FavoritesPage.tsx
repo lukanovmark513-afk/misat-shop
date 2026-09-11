@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { toggleFavoriteAsync } from '../store/slices/favoritesSlice';
@@ -6,41 +6,65 @@ import { addToCartAsync } from '../store/slices/cartSlice';
 import { productsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
-const FavoritesPage = () => {
-  const dispatch = useAppDispatch();
-  const favorites = useAppSelector((state) => state.favorites.items);
-  const [favoriteProducts, setFavoriteProducts] = useState<any[]>([]);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [addingToCart, setAddingToCart] = useState<number | null>(null);
+// ============================================
+// ТИПЫ
+// ============================================
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+  old_price?: number;
+  image?: string;
+  images: string[];
+  sizes: string[];
+  colors: string[];
+  category: string;
+  rating: number;
+  reviews: number;
+  is_new?: boolean;
+  is_sale?: boolean;
+  stockType?: string;
+  preorderDays?: number;
+  prepaymentPercent?: number;
+}
 
-  // Функция для получения рейтинга товара из отзывов
-  const getProductRating = (productId: number) => {
-    const allReviews = JSON.parse(localStorage.getItem('misat_reviews') || '[]');
-    const productReviews = allReviews.filter((r: any) => r.productId === productId);
-    if (productReviews.length === 0) return 0;
-    const avg = productReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / productReviews.length;
-    return Math.round(avg * 2) / 2;
-  };
-
-  // Функция для получения количества отзывов
-  const getProductReviewsCount = (productId: number) => {
-    const allReviews = JSON.parse(localStorage.getItem('misat_reviews') || '[]');
-    return allReviews.filter((r: any) => r.productId === productId).length;
-  };
-
-  const parseArrayField = (field: any): string[] => {
-    if (!field) return [];
-    if (Array.isArray(field)) return field;
-    if (typeof field === 'string') {
-      try {
-        return JSON.parse(field);
-      } catch {
-        return [];
-      }
+// ============================================
+// БЕЗОПАСНЫЙ ПАРСЕР
+// ============================================
+const safeParseArray = (value: any): any[] => {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
     }
-    return [];
-  };
+  }
+  return [];
+};
+
+// ============================================
+// КОМПОНЕНТ КАРТОЧКИ ТОВАРА
+// ============================================
+interface ProductCardProps {
+  product: Product;
+  isFavorite: boolean;
+  onToggleFavorite: (id: number, e: React.MouseEvent) => void;
+  onAddToCart: (product: Product) => void;
+  isAdding: boolean;
+}
+
+const ProductCard = React.memo(({
+  product,
+  isFavorite,
+  onToggleFavorite,
+  onAddToCart,
+  isAdding
+}: ProductCardProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -51,20 +75,176 @@ const FavoritesPage = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const getStatusBadge = () => {
+    switch (product.stockType) {
+      case 'instock':
+        return { text: 'В НАЛИЧИИ', className: 'text-green-400 border-green-400/20' };
+      case 'china':
+        return { text: 'ПОД ЗАКАЗ', className: 'text-yellow-400 border-yellow-400/20' };
+      case 'preorder':
+        return { text: 'ПРЕДЗАКАЗ', className: 'text-amber-400 border-amber-400/20' };
+      default:
+        return { text: 'В НАЛИЧИИ', className: 'text-green-400 border-green-400/20' };
+    }
+  };
+
+  const status = getStatusBadge();
+
+  // На мобильных кнопка всегда видна, на ПК - только при ховере
+  const buttonVisibility = isMobile
+    ? 'opacity-100 translate-y-0'
+    : (isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2');
+
+  return (
+    <div
+      className="group bg-gradient-to-b from-white/[0.06] to-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 hover:-translate-y-1 transition-all duration-500"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Link to={`/product/${product.id}`}>
+        <div className="relative aspect-square overflow-hidden bg-[#0a0a0a]">
+          <img
+            src={product.images?.[0] || product.image || 'https://placehold.co/400x400/0a0a0a/333'}
+            alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            loading="lazy"
+          />
+
+          {(product.stockType === 'instock' || product.stockType === 'china' || product.stockType === 'preorder') && (
+            <span className={`absolute bottom-3 left-3 bg-black/80 backdrop-blur px-2 py-1 text-[8px] tracking-[0.15em] border ${status.className}`}>
+              {status.text}
+            </span>
+          )}
+
+          {product.is_new && (
+            <span className="absolute top-3 left-3 text-[9px] tracking-[0.15em] text-white/40 border border-white/20 px-2 py-0.5">
+              НОВИНКА
+            </span>
+          )}
+          {product.is_sale && product.old_price && (
+            <span className="absolute top-3 right-3 text-[9px] tracking-[0.15em] text-white/40 border border-white/20 px-2 py-0.5">
+              SALE
+            </span>
+          )}
+
+          <button
+            onClick={(e) => onToggleFavorite(product.id, e)}
+            className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 z-10
+              ${isFavorite
+                ? 'bg-red-500/90 text-white shadow-lg shadow-red-500/30'
+                : 'bg-black/60 backdrop-blur text-white/60 hover:bg-white/20'
+              }
+              ${isHovered || isMobile ? 'opacity-100' : 'opacity-0'}
+            `}
+          >
+            <i className={`${isFavorite ? 'fas' : 'far'} fa-heart text-xs`} />
+          </button>
+        </div>
+      </Link>
+
+      <div className="p-3 md:p-4">
+        <Link to={`/product/${product.id}`}>
+          <h3 className="text-white font-medium text-xs md:text-sm mb-1 hover:text-white/70 transition line-clamp-1">
+            {product.name}
+          </h3>
+        </Link>
+
+        <div className="flex items-center gap-0.5 mb-2">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <i
+              key={star}
+              className={`${
+                star <= Math.floor(product.rating)
+                  ? 'fas fa-star text-amber-400'
+                  : star - 0.5 <= product.rating
+                  ? 'fas fa-star-half-alt text-amber-400'
+                  : 'far fa-star text-white/20'
+              } text-[8px] md:text-[9px]`}
+            />
+          ))}
+          {product.reviews > 0 && (
+            <span className="text-white/20 text-[7px] md:text-[8px] ml-1">({product.reviews})</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-white font-bold text-sm md:text-base">
+            {product.price.toLocaleString()} ₽
+          </span>
+          {product.old_price && (
+            <span className="text-white/30 text-[9px] md:text-xs line-through">
+              {product.old_price.toLocaleString()} ₽
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={() => onAddToCart(product)}
+          disabled={isAdding}
+          className={`w-full py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-bold tracking-wider transition-all duration-300 ${buttonVisibility}
+            bg-white/10 hover:bg-white hover:text-black text-white border border-white/10 disabled:opacity-50`}
+        >
+          {isAdding ? '...' : 'В КОРЗИНУ'}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+ProductCard.displayName = 'ProductCard';
+
+// ============================================
+// ОСНОВНОЙ КОМПОНЕНТ
+// ============================================
+const FavoritesPage = () => {
+  const dispatch = useAppDispatch();
+  const favorites = useAppSelector((state) => state.favorites.items);
+  const [favoriteProducts, setFavoriteProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [addingToCart, setAddingToCart] = useState<number | null>(null);
+
+  // Множество избранного для O(1) проверки
+  const favoriteSet = useMemo(
+    () => new Set(favorites),
+    [favorites]
+  );
+
+  // ============================================
+  // ЗАГРУЗКА ТОВАРОВ
+  // ============================================
   useEffect(() => {
     const loadFavorites = async () => {
       try {
         setIsLoading(true);
         const response = await productsAPI.getAll();
-        const productsWithArrays = response.data.map((product: any) => ({
-          ...product,
-          sizes: parseArrayField(product.sizes),
-          colors: parseArrayField(product.colors),
-          images: parseArrayField(product.images),
-          rating: getProductRating(product.id),
-          reviews: getProductReviewsCount(product.id)
+
+        let productsData = [];
+        if (Array.isArray(response.data)) {
+          productsData = response.data;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          productsData = response.data.data;
+        } else if (response.data?.products && Array.isArray(response.data.products)) {
+          productsData = response.data.products;
+        } else {
+          console.error('Неожиданный формат ответа:', response.data);
+          productsData = [];
+        }
+
+        const parsed = productsData.map((p: any) => ({
+          ...p,
+          sizes: safeParseArray(p.sizes),
+          colors: safeParseArray(p.colors),
+          images: safeParseArray(p.images),
+          rating: 0,
+          reviews: 0,
+          stockType: p.stockType || 'instock',
+          preorderDays: p.preorderDays || 10,
+          is_new: p.is_new || false,
+          is_sale: p.is_sale || false,
+          old_price: p.old_price || null,
         }));
-        const favProducts = productsWithArrays.filter((p: any) => favorites.includes(p.id));
+
+        const favProducts = parsed.filter((p: any) => favorites.includes(p.id));
         setFavoriteProducts(favProducts);
       } catch (error) {
         console.error('Ошибка загрузки избранного:', error);
@@ -76,12 +256,10 @@ const FavoritesPage = () => {
     loadFavorites();
   }, [favorites]);
 
-  const handleRemoveFromFavorites = (productId: number, productName: string) => {
-    dispatch(toggleFavoriteAsync(productId));
-    toast.success(`${productName} удалён из избранного`);
-  };
-
-  const handleAddToCart = async (product: any) => {
+  // ============================================
+  // CALLBACKS
+  // ============================================
+  const handleAddToCart = useCallback(async (product: Product) => {
     setAddingToCart(product.id);
     try {
       await dispatch(addToCartAsync({
@@ -92,8 +270,8 @@ const FavoritesPage = () => {
           id: product.id,
           name: product.name,
           price: product.price,
-          image: product.images?.[0] || product.image,
-          sizes: product.sizes,
+          image: product.images?.[0] || product.image || '',
+          sizes: product.sizes || ['S', 'M', 'L'],
           stockType: product.stockType,
           preorderDays: product.preorderDays
         }
@@ -104,211 +282,140 @@ const FavoritesPage = () => {
     } finally {
       setAddingToCart(null);
     }
-  };
+  }, [dispatch]);
 
+  const handleToggleFavorite = useCallback((productId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dispatch(toggleFavoriteAsync(productId));
+  }, [dispatch]);
+
+  // ============================================
+  // LOADING
+  // ============================================
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] pt-20 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto">
-            <div className="absolute inset-0 border-2 border-white/20 rounded-full"></div>
-            <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p className="text-gray-500 text-xs tracking-wider mt-4 animate-pulse">ЗАГРУЗКА</p>
+      <div className="min-h-screen bg-[#050505] pt-20 flex items-center justify-center">
+        <div className="relative w-12 h-12 md:w-16 md:h-16 mx-auto">
+          <div className="absolute inset-0 border border-white/10 rounded-full" />
+          <div className="absolute inset-0 border border-white border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
     );
   }
 
+  // ============================================
+  // ПУСТОЕ ИЗБРАННОЕ
+  // ============================================
   if (favoriteProducts.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] pt-20">
-        <div className="w-full px-4 md:px-8 lg:px-16 py-12">
-          <div className="max-w-md mx-auto text-center">
-            <div className="w-20 h-20 mx-auto bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-              <i className="far fa-heart text-white/40 text-3xl"></i>
-            </div>
-            <h2 className="text-2xl font-black text-white mb-3">ИЗБРАННОЕ ПУСТО</h2>
-            <p className="text-gray-400 text-sm mb-8">Добавляйте товары в избранное, чтобы не потерять их</p>
-            <Link to="/catalog" className="inline-block bg-white text-black px-8 py-3 font-bold text-sm tracking-wider hover:bg-white/90 transition rounded-xl">
-              ПЕРЕЙТИ В КАТАЛОГ
+      <div className="min-h-screen bg-[#050505] text-white pt-12 md:pt-20 pb-28 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[#050505]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%)]" />
+          <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 md:px-8 lg:px-16 py-4 md:py-8">
+          <div className="text-xs text-gray-500 mt-6 md:mt-0 mb-4 md:mb-6">
+            <Link to="/" className="hover:text-white transition text-gray-400 md:text-gray-500 inline-block">
+              Главная
             </Link>
+            <span className="inline-block mx-1"> </span>
+            <i className="fas fa-chevron-right text-[9px] text-gray-600 inline-block"></i>
+            <span className="inline-block mx-1"> </span>
+            <span className="text-white/80 md:text-white inline-block">Избранное</span>
+          </div>
+
+          <div className="max-w-md mx-auto text-center mt-2 md:mt-12">
+            <div className="relative">
+              <div className="w-28 h-28 md:w-32 md:h-32 mx-auto bg-white/5 rounded-full flex items-center justify-center mb-6 md:mb-8 relative">
+                <div className="absolute inset-0 bg-white/5 rounded-full animate-pulse"></div>
+                <div className="absolute inset-2 border border-white/10 rounded-full"></div>
+                <i className="far fa-heart text-white/20 text-4xl md:text-5xl relative z-10"></i>
+              </div>
+            </div>
+
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white mb-3 md:mb-4">
+              ИЗБРАННОЕ ПУСТО
+            </h1>
+
+            <p className="text-gray-400 text-xs md:text-sm mb-6 md:mb-8 max-w-sm mx-auto">
+              Добавляйте товары в избранное, чтобы не потерять их.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link to="/catalog" className="inline-flex items-center justify-center gap-2 bg-white text-black px-6 md:px-8 py-3 md:py-3.5 font-bold text-xs md:text-sm tracking-wider hover:bg-white/90 transition rounded-xl">
+                <i className="fas fa-arrow-right text-xs md:text-sm"></i>
+                ПЕРЕЙТИ В КАТАЛОГ
+              </Link>
+              <Link to="/" className="inline-flex items-center justify-center gap-2 border border-white/10 text-white/70 px-6 md:px-8 py-3 md:py-3.5 font-medium text-xs md:text-sm hover:bg-white/5 hover:text-white transition rounded-xl">
+                <i className="fas fa-home text-xs md:text-sm"></i>
+                НА ГЛАВНУЮ
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // ============================================
+  // ИЗБРАННОЕ С ТОВАРАМИ
+  // ============================================
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pt-20">
-      <div className="w-full px-4 md:px-8 lg:px-16 py-8">
+    <div className="min-h-screen bg-[#050505] pt-16 md:pt-20 pb-20 md:pb-0 relative overflow-hidden">
+      {/* Background FX */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[#050505]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,0.04),transparent_60%)]" />
+        <div className="absolute inset-0 opacity-[0.02] bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:60px_60px]" />
+        <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-white/[0.02] blur-[150px]" />
+        <div className="absolute bottom-[-100px] right-0 w-[300px] h-[300px] rounded-full bg-white/[0.015] blur-[120px]" />
+      </div>
 
-        {/* Баннер */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900/80 via-gray-800/80 to-black border border-white/10 mb-8">
-          <div className="absolute inset-0 opacity-20">
-            <img
-              src="/images/brands/raspr.jpg"
-              alt="Favorites"
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
+      <div className="relative z-10 w-full px-3 md:px-8 lg:px-16 py-4 md:py-6 pb-24 md:pb-6">
 
-          <div className="relative py-8 px-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-0.5 bg-white/40"></div>
-                <span className="text-gray-400 text-[10px] tracking-[0.3em]">ИЗБРАННОЕ</span>
-              </div>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
-                ИЗБРАННЫЕ ТОВАРЫ
-              </h1>
-              <p className="text-gray-400 text-sm mt-2">
-                <span className="text-white font-bold">{favoriteProducts.length}</span> товаров в избранном
-              </p>
-            </div>
-          </div>
+        {/* Хлебные крошки */}
+        <div className="text-xs text-white/30 mt-2 md:mt-0 mb-4 md:mb-6">
+          <Link to="/" className="hover:text-white/60 transition">Главная</Link>
+          <span className="mx-1"> / </span>
+          <span className="text-white/60">Избранное</span>
         </div>
 
-        {/* Десктопная сетка с отзывами */}
-        {!isMobile ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {favoriteProducts.map(product => (
-              <div key={product.id} className="group bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 transition-all duration-300 hover:-translate-y-1 border border-white/10 hover:border-white/30">
-                <Link to={`/product/${product.id}`}>
-                  <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-900 to-black">
-                    <img
-                      src={product.images?.[0] || product.image || 'https://placehold.co/400x400/1a1a1a/666666'}
-                      alt={product.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/1a1a1a/666666';
-                      }}
-                    />
-                    {product.is_new && (
-                      <span className="absolute top-2 left-2 bg-white/90 text-black text-[9px] font-bold px-2 py-0.5 rounded-full">NEW</span>
-                    )}
-                    {product.is_sale && product.old_price && (
-                      <span className="absolute top-2 right-2 bg-red-500/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-                        -{Math.round((1 - product.price / product.old_price) * 100)}%
-                      </span>
-                    )}
-                  </div>
-                </Link>
-                <div className="p-4">
-                  <Link to={`/product/${product.id}`}>
-                    <h3 className="text-white font-bold text-sm mb-1 hover:text-gray-300 transition line-clamp-1">
-                      {product.name}
-                    </h3>
-                  </Link>
-
-                  {/* ЗВЁЗДЫ РЕЙТИНГА */}
-                  <div className="flex items-center gap-0.5 mb-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <i
-                        key={star}
-                        className={`${
-                          star <= Math.floor(product.rating)
-                            ? 'fas fa-star text-amber-400'
-                            : star - 0.5 <= product.rating
-                            ? 'fas fa-star-half-alt text-amber-400'
-                            : 'far fa-star text-gray-500'
-                        } text-[9px]`}
-                      />
-                    ))}
-                    {product.reviews > 0 && (
-                      <span className="text-gray-500 text-[9px] ml-1">({product.reviews})</span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-white font-bold text-base">{product.price.toLocaleString()} ₽</span>
-                    {product.old_price && (
-                      <span className="text-gray-500 text-[9px] line-through">{product.old_price.toLocaleString()} ₽</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      disabled={addingToCart === product.id}
-                      className="flex-1 bg-white/10 text-white py-2 rounded-lg text-[10px] font-bold tracking-wider hover:bg-white hover:text-black transition disabled:opacity-50"
-                    >
-                      {addingToCart === product.id ? '...' : 'В КОРЗИНУ'}
-                    </button>
-                    <button
-                      onClick={() => handleRemoveFromFavorites(product.id, product.name)}
-                      className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-500 hover:text-white transition"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* Заголовок */}
+        <div className="mb-6 md:mb-8">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-6 h-px bg-white/40"></div>
+            <span className="text-white/30 text-[8px] md:text-[10px] tracking-[0.2em] font-bold">ИЗБРАННОЕ</span>
           </div>
-        ) : (
-          /* Мобильная версия с отзывами */
-          <div className="space-y-3 pb-20">
-            {favoriteProducts.map(product => (
-              <div key={product.id} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                <div className="flex gap-3">
-                  <Link to={`/product/${product.id}`} className="flex-shrink-0">
-                    <img
-                      src={product.images?.[0] || product.image || 'https://placehold.co/80x80/1a1a1a/666666'}
-                      alt={product.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/1a1a1a/666666';
-                      }}
-                    />
-                  </Link>
-                  <div className="flex-1">
-                    <Link to={`/product/${product.id}`}>
-                      <h3 className="text-white font-bold text-sm line-clamp-1">{product.name}</h3>
-                    </Link>
+          <h1 className="text-2xl md:text-4xl font-black tracking-tighter text-white">ИЗБРАННЫЕ ТОВАРЫ</h1>
+          <p className="text-white/30 text-[9px] md:text-xs mt-1">{favoriteProducts.length} товаров</p>
+        </div>
 
-                    {/* ЗВЁЗДЫ РЕЙТИНГА */}
-                    <div className="flex items-center gap-0.5 mt-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <i
-                          key={star}
-                          className={`${
-                            star <= Math.floor(product.rating)
-                              ? 'fas fa-star text-amber-400'
-                              : star - 0.5 <= product.rating
-                              ? 'fas fa-star-half-alt text-amber-400'
-                              : 'far fa-star text-gray-500'
-                          } text-[8px]`}
-                        />
-                      ))}
-                      {product.reviews > 0 && (
-                        <span className="text-gray-500 text-[8px] ml-1">({product.reviews})</span>
-                      )}
-                    </div>
-
-                    <p className="text-white font-bold text-sm mt-1">{product.price.toLocaleString()} ₽</p>
-                    <div className="flex justify-between items-center mt-2">
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        className="bg-white/10 text-white px-3 py-1.5 rounded-lg text-[9px] font-bold hover:bg-white hover:text-black transition"
-                      >
-                        В КОРЗИНУ
-                      </button>
-                      <button
-                        onClick={() => handleRemoveFromFavorites(product.id, product.name)}
-                        className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-[9px] font-bold hover:bg-red-500 hover:text-white transition"
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Сетка товаров */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-5">
+          {favoriteProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              isFavorite={favoriteSet.has(product.id)}
+              onToggleFavorite={handleToggleFavorite}
+              onAddToCart={handleAddToCart}
+              isAdding={addingToCart === product.id}
+            />
+          ))}
+        </div>
       </div>
+
+      <style>{`
+        .line-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 };

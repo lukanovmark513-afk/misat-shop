@@ -1,6 +1,7 @@
 // components/HeroSlider.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 const HeroSlider = () => {
   const [activeSlide, setActiveSlide] = useState(0);
@@ -172,88 +173,162 @@ const HeroSlider = () => {
     }
   };
 
+  // Структурированные данные для Store
+  const storeSchema = {
+    "@context": "https://schema.org",
+    "@type": "Store",
+    "name": "MISAT",
+    "url": "https://misat.ru",
+    "logo": "https://misat.ru/logo.png",
+    "image": "https://misat.ru/images/og/home.jpg",
+    "description": "Интернет-магазин брендовой одежды и обуви.",
+    "telephone": "+79938843766",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Смоленск",
+      "addressCountry": "RU"
+    }
+  };
+
   return (
-    <div
-      className="relative h-[50vh] min-h-[400px] md:h-[60vh] md:min-h-[500px] w-full overflow-hidden"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {slides.map((slide, index) => {
-        let translateX = '100%';
-        if (activeSlide === index) {
-          translateX = '0';
-        } else if (activeSlide > index) {
-          translateX = '-100%';
-        }
+    <>
+      <Helmet>
+        <title>MISAT — Брендовая одежда и обувь из Китая | Nike, Gucci, Stone Island</title>
 
-        return (
-          <div
-            key={slide.id}
-            className="absolute inset-0 transition-transform duration-500 md:duration-700 ease-out will-change-transform"
-            style={{
-              transform: `translateX(${translateX})`,
-              zIndex: activeSlide === index ? 10 : 0
-            }}
-          >
+        <meta
+          name="description"
+          content="MISAT — интернет-магазин брендовой одежды, обуви и аксессуаров. Nike, Gucci, Stone Island, Adidas, Balenciaga, The North Face и другие бренды. Доставка по всей России."
+        />
+
+        <meta
+          name="keywords"
+          content="MISAT, брендовая одежда, одежда из Китая, Nike, Gucci, Stone Island, Adidas, Balenciaga, The North Face, люкс одежда, доставка по России, купить одежду"
+        />
+
+        <link rel="canonical" href="https://misat.ru/" />
+
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="MISAT — Брендовая одежда и обувь из Китая" />
+        <meta
+          property="og:description"
+          content="Оригинальная одежда и обувь мировых брендов. Быстрая доставка по России. Новые коллекции Nike, Gucci, Stone Island и других брендов."
+        />
+        <meta property="og:url" content="https://misat.ru/" />
+        <meta property="og:image" content="https://misat.ru/images/og/home.jpg" />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="MISAT — Брендовая одежда и обувь" />
+        <meta
+          name="twitter:description"
+          content="Nike, Gucci, Stone Island, Adidas и другие бренды. Доставка по всей России."
+        />
+        <meta name="twitter:image" content="https://misat.ru/images/og/home.jpg" />
+
+        {/* Структурированные данные */}
+        <script type="application/ld+json">
+          {JSON.stringify(storeSchema)}
+        </script>
+      </Helmet>
+
+      {/* Hero Slider - поднят выше на ПК */}
+      <div
+        className={`relative w-full overflow-hidden ${
+          isMobile
+            ? 'h-[50vh] min-h-[400px]'
+            : 'h-[85vh] min-h-[650px] lg:h-[90vh] lg:min-h-[750px] -mt-16 md:-mt-20 lg:-mt-24'
+        }`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {slides.map((slide, index) => {
+          let translateX = '100%';
+          if (activeSlide === index) {
+            translateX = '0';
+          } else if (activeSlide > index) {
+            translateX = '-100%';
+          }
+
+          return (
             <div
-              className="absolute inset-0 bg-cover bg-center"
+              key={slide.id}
+              className="absolute inset-0 transition-transform duration-500 md:duration-700 ease-out will-change-transform"
               style={{
-                backgroundImage: `url(${slide.image})`,
-                backgroundPosition: 'top center',
-                backgroundSize: 'cover'
+                transform: `translateX(${translateX})`,
+                zIndex: activeSlide === index ? 10 : 0
               }}
-            />
+            >
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{
+                  backgroundImage: `url(${slide.image})`,
+                  backgroundPosition: 'top center',
+                  backgroundSize: 'cover'
+                }}
+              />
 
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-24 md:h-56 bg-gradient-to-t from-black via-black/80 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-24 md:h-56 bg-gradient-to-t from-black via-black/80 to-transparent" />
 
-            <div className="relative h-full flex flex-col items-center justify-end text-center px-4 md:px-6 pb-12 md:pb-20">
-              <div className="max-w-[260px] md:max-w-[500px]">
-                {slide.subtitle && (
-                  <p className="text-white/50 text-[8px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] mb-2 md:mb-3 uppercase font-light">
-                    {slide.subtitle}
-                  </p>
-                )}
-                <h1 className="text-3xl md:text-6xl lg:text-7xl font-['Bebas_Neue'] font-black text-white tracking-wide mb-3 md:mb-6 leading-[1.05]">
-                  {slide.title}
-                </h1>
-                <Link
-                  to={slide.btnLink}
-                  className={`inline-flex items-center justify-center gap-2 px-6 md:px-10 py-2.5 md:py-3 text-[11px] md:text-sm font-bold rounded-full transition-all duration-300 hover:scale-105 active:scale-95 ${getButtonStyle(slide.btnStyle)}`}
-                >
-                  <span>{slide.btnText}</span>
-                  <svg className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
+              <div className="relative h-full flex flex-col items-center justify-end text-center px-4 md:px-6 pb-12 md:pb-20">
+                <div className="max-w-[260px] md:max-w-[500px]">
+                  {slide.subtitle && (
+                    <p className="text-white/50 text-[8px] md:text-[11px] tracking-[0.2em] md:tracking-[0.3em] mb-2 md:mb-3 uppercase font-light">
+                      {slide.subtitle}
+                    </p>
+                  )}
+                  <h1 className="text-3xl md:text-6xl lg:text-7xl font-['Bebas_Neue'] font-black text-white tracking-wide mb-3 md:mb-6 leading-[1.05]">
+                    {slide.title}
+                  </h1>
+                  <Link
+                    to={slide.btnLink}
+                    className={`inline-flex items-center justify-center gap-2 px-6 md:px-10 py-2.5 md:py-3 text-[11px] md:text-sm font-bold rounded-full transition-all duration-300 hover:scale-105 active:scale-95 ${getButtonStyle(slide.btnStyle)}`}
+                  >
+                    <span>{slide.btnText}</span>
+                    <svg className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
 
-      {/* СТРЕЛКИ НАВИГАЦИИ - видны на всех устройствах */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-300"
-        aria-label="Предыдущий слайд"
-      >
-        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
+        {/* СТРЕЛКИ НАВИГАЦИИ - видны на всех устройствах */}
+        <button
+          onClick={prevSlide}
+          className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-300"
+          aria-label="Предыдущий слайд"
+        >
+          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
 
-      <button
-        onClick={nextSlide}
-        className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-300"
-        aria-label="Следующий слайд"
-      >
-        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-    </div>
+        <button
+          onClick={nextSlide}
+          className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 md:w-10 md:h-10 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 hover:scale-110 transition-all duration-300"
+          aria-label="Следующий слайд"
+        >
+          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* SEO-блок для поисковиков (скрыт визуально) */}
+      <section className="sr-only">
+        <h2>Брендовая одежда и обувь</h2>
+        <p>
+          Интернет-магазин MISAT предлагает одежду, обувь и аксессуары
+          Nike, Gucci, Stone Island, Adidas, Balenciaga, Raf Simons,
+          The North Face и других мировых брендов с доставкой по России.
+        </p>
+      </section>
+    </>
   );
 };
 

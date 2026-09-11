@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Provider, useDispatch } from 'react-redux';
 import { store, AppDispatch } from './store';
 import { Toaster } from 'react-hot-toast';
+import { HelmetProvider } from 'react-helmet-async';
 import { fetchCart, mergeGuestCart } from './store/slices/cartSlice';
 import { fetchFavorites } from './store/slices/favoritesSlice';
+import { loadUser } from './store/slices/authSlice';
 import ScrollToTop from './components/common/ScrollToTop';
-import AnimatedEntry from './components/AnimatedEntry'; // ← ДОБАВИТЬ
+import AnimatedEntry from './components/AnimatedEntry';
 
 // Layout
 import Header from './components/layout/Header';
@@ -43,23 +45,43 @@ import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
+import AdminBrands from './pages/admin/AdminBrands';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPromocodes from './pages/admin/AdminPromocodes';
 import AdminChat from './pages/admin/AdminChat';
 
-// Components
+// Chat Page
+import ChatPage from './pages/ChatPage';
+
+// Chat Component
 import ChatSupport from './components/chat/ChatSupport';
 import { getCurrentUser } from './services/storageService';
 
+// Создаем HelmetProvider с настройками
+const helmetContext = {};
+
 const AppContent = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const [isMobile, setIsMobile] = React.useState(false);
 
   useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    // Загружаем пользователя при старте
+    dispatch(loadUser());
+    dispatch(fetchFavorites());
+
     const user = getCurrentUser();
     if (user) {
       dispatch(fetchCart());
-      dispatch(fetchFavorites());
       dispatch(mergeGuestCart());
     }
   }, [dispatch]);
@@ -79,6 +101,7 @@ const AppContent = () => {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/balance-topup" element={<BalanceTopupPage />} />
+          <Route path="/chat" element={<ChatPage />} />
 
           <Route path="/about" element={<AboutPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
@@ -97,6 +120,7 @@ const AppContent = () => {
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="categories" element={<AdminCategories />} />
+            <Route path="brands" element={<AdminBrands />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="promocodes" element={<AdminPromocodes />} />
             <Route path="chat" element={<AdminChat />} />
@@ -104,7 +128,11 @@ const AppContent = () => {
         </Routes>
       </main>
       <Footer />
-      <ChatSupport />
+
+      {/* Чат только на ПК (как плавающая кнопка) */}
+      {!isMobile && <ChatSupport />}
+
+      {/* Навигация только на телефоне */}
       <MobileBottomNav />
     </div>
   );
@@ -112,19 +140,48 @@ const AppContent = () => {
 
 const App = () => (
   <Provider store={store}>
-    <Router>
-      <ScrollToTop />
-      <Toaster
-        position="bottom-center"
-        toastOptions={{
-          style: { background: '#000', color: '#fff', borderRadius: '12px' },
-          duration: 2000
-        }}
-      />
-      <AnimatedEntry duration={2500}> {/* ← ОБЕРНИ В АНИМАЦИЮ */}
-        <AppContent />
-      </AnimatedEntry>
-    </Router>
+    <HelmetProvider context={helmetContext}>
+      <Router>
+        <ScrollToTop />
+        <Toaster
+          position="top-center"
+          gutter={8}
+          containerStyle={{
+            top: 80,
+            zIndex: 9999,
+          }}
+          toastOptions={{
+            duration: 3000,
+            success: {
+              duration: 2500,
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 3500,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+            style: {
+              background: '#1a1a1a',
+              color: '#fff',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              padding: '10px 16px',
+              fontSize: '13px',
+              backdropFilter: 'blur(10px)',
+            },
+          }}
+        />
+        <AnimatedEntry duration={2500}>
+          <AppContent />
+        </AnimatedEntry>
+      </Router>
+    </HelmetProvider>
   </Provider>
 );
 

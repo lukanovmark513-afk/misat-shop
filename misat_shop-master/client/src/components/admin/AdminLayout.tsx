@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
@@ -18,8 +18,9 @@ const AdminLayout = () => {
     { path: '/admin/products', label: 'Товары', icon: 'fa-box' },
     { path: '/admin/orders', label: 'Заказы', icon: 'fa-truck' },
     { path: '/admin/categories', label: 'Категории', icon: 'fa-tags' },
+    { path: '/admin/brands', label: 'Бренды', icon: 'fa-tag' },
     { path: '/admin/users', label: 'Пользователи', icon: 'fa-users' },
-    { path: '/admin/promocodes', label: 'Промокоды', icon: 'fa-tag' },
+    { path: '/admin/promocodes', label: 'Промокоды', icon: 'fa-ticket' },
     { path: '/admin/chat', label: 'Чат', icon: 'fa-comments' },
   ];
 
@@ -27,13 +28,6 @@ const AdminLayout = () => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-
-      // Если мобильное устройство - перенаправляем на главную
-      if (mobile) {
-        toast.error('Админ-панель доступна только на компьютере');
-        navigate('/');
-      }
-
       if (!mobile) {
         setIsSidebarOpen(true);
       } else {
@@ -54,16 +48,6 @@ const AdminLayout = () => {
       );
 
       if (newOrders.length > 0 && newOrders.some(o => o.status === 'pending')) {
-        const audio = new Audio('/notification.mp3');
-        audio.play().catch(e => console.log('Audio play failed'));
-
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Новый заказ!', {
-            body: `Поступил новый заказ на сумму ${newOrders[0].total.toLocaleString()} ₽`,
-            icon: '/logo192.png'
-          });
-        }
-
         toast('📦 Новый заказ!', { duration: 5000 });
         localStorage.setItem('last_order_check', new Date().toISOString());
       }
@@ -72,26 +56,18 @@ const AdminLayout = () => {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'denied' && Notification.permission !== 'granted') {
-      Notification.requestPermission();
-    }
-  }, []);
-
   if (!user || user.role !== 'admin') {
     navigate('/');
-    toast.error('У вас нет доступа к админ-панели');
+    toast.error('Нет доступа к админ-панели');
     return null;
   }
 
-  // Если мобильное устройство - не рендерим админку (редирект уже сделан)
   if (isMobile) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Mobile Sidebar Toggle */}
+    <div className="min-h-screen bg-black pt-16">
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="lg:hidden fixed bottom-6 right-6 z-50 bg-white text-black w-12 h-12 rounded-full shadow-xl flex items-center justify-center hover:bg-gray-100 transition-all duration-300"
@@ -103,8 +79,7 @@ const AdminLayout = () => {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* Sidebar - теперь ниже шапки */}
-      <aside className={`fixed left-0 top-20 h-[calc(100vh-5rem)] bg-black border-r border-white/10 transition-all duration-300 z-40 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+      <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-black border-r border-white/10 transition-all duration-300 z-40 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
         <div className="flex flex-col h-full">
           <div className="p-5 border-b border-white/10">
             <div className={`flex items-center gap-3 ${!isSidebarOpen && 'justify-center'}`}>
@@ -120,7 +95,7 @@ const AdminLayout = () => {
             </div>
           </div>
 
-          <nav className="flex-1 p-3 space-y-1">
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
             {menuItems.map(item => {
               const isActive = location.pathname === item.path;
               return (
@@ -158,8 +133,7 @@ const AdminLayout = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
-       <main className={`transition-all duration-300 min-h-screen pt-20 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
+      <main className={`transition-all duration-300 min-h-screen ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
         <div className="p-4 md:p-6">
           <Outlet />
         </div>

@@ -160,7 +160,10 @@ const initLocalStorage = () => {
 
 initLocalStorage();
 
+// ============================================
 // ============ ПОЛЬЗОВАТЕЛИ ============
+// ============================================
+
 export const getUsers = (): User[] => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
 };
@@ -207,6 +210,8 @@ export const loginUser = (email: string, password: string): User | null => {
   const user = users.find(u => u.email === email);
 
   if (user && passwords[email] === password) {
+    // 🔥 СОХРАНЯЕМ В ОБА КЛЮЧА
+    localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     return user;
   }
@@ -214,12 +219,85 @@ export const loginUser = (email: string, password: string): User | null => {
 };
 
 export const logoutUser = () => {
+  // 🔥 УДАЛЯЕМ ИЗ ОБОИХ КЛЮЧЕЙ
+  localStorage.removeItem('user');
   localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  localStorage.removeItem('token');
 };
 
+// ============================================
+// ============ СИНХРОНИЗАЦИЯ С AUTH ============
+// ============================================
+
+/**
+ * Получение пользователя из localStorage
+ * Сначала проверяет ключ 'user' (используется в authSlice),
+ * потом 'misat_current_user' (старый ключ)
+ */
 export const getCurrentUser = (): User | null => {
-  const user = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-  return user ? JSON.parse(user) : null;
+  try {
+    // 🔥 СНАЧАЛА ИЩЕМ В НОВОМ КЛЮЧЕ (authSlice)
+    const user = localStorage.getItem('user');
+    if (user) {
+      return JSON.parse(user);
+    }
+    // ЕСЛИ НЕТ — ИЩЕМ В СТАРОМ КЛЮЧЕ (storageService)
+    const oldUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (oldUser) {
+      return JSON.parse(oldUser);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Получение токена из localStorage
+ */
+export const getToken = (): string | null => {
+  return localStorage.getItem('token');
+};
+
+/**
+ * Проверка авторизации
+ */
+export const isAuthenticated = (): boolean => {
+  return !!(getToken() && getCurrentUser());
+};
+
+/**
+ * Обновление пользователя в обоих ключах
+ */
+export const syncUser = (user: User | null) => {
+  if (user) {
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+  } else {
+    localStorage.removeItem('user');
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  }
+};
+
+/**
+ * Обновление баланса пользователя
+ */
+export const updateUserBalance = (userId: number, newBalance: number): boolean => {
+  const users = getUsers();
+  const index = users.findIndex(u => u.id === userId);
+  if (index !== -1) {
+    users[index].balance = newBalance;
+    saveUsers(users);
+
+    // Обновляем текущего пользователя
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.id === userId) {
+      currentUser.balance = newBalance;
+      syncUser(currentUser);
+    }
+    return true;
+  }
+  return false;
 };
 
 export const changePassword = (userId: number, oldPassword: string, newPassword: string): boolean => {
@@ -232,7 +310,10 @@ export const changePassword = (userId: number, oldPassword: string, newPassword:
   return true;
 };
 
+// ============================================
 // ============ БАЛАНС ============
+// ============================================
+
 export const getUserBalance = (userId: number): number => {
   const users = getUsers();
   const user = users.find(u => u.id === userId);
@@ -248,7 +329,7 @@ export const addToBalance = (userId: number, amount: number): boolean => {
     const currentUser = getCurrentUser();
     if (currentUser && currentUser.id === userId) {
       currentUser.balance = users[index].balance;
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+      syncUser(currentUser);
     }
     return true;
   }
@@ -264,14 +345,17 @@ export const subtractFromBalance = (userId: number, amount: number): boolean => 
     const currentUser = getCurrentUser();
     if (currentUser && currentUser.id === userId) {
       currentUser.balance = users[index].balance;
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+      syncUser(currentUser);
     }
     return true;
   }
   return false;
 };
 
+// ============================================
 // ============ ТОВАРЫ ============
+// ============================================
+
 export const getProducts = (): Product[] => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCTS) || '[]');
 };
@@ -316,7 +400,10 @@ export const deleteProduct = (id: number): boolean => {
   return filtered.length !== products.length;
 };
 
+// ============================================
 // ============ КОРЗИНА ============
+// ============================================
+
 export const getCart = (userId: number): CartItem[] => {
   const cart = JSON.parse(localStorage.getItem(STORAGE_KEYS.CART) || '[]');
   return cart.filter((item: CartItem) => item.userId === userId);
@@ -378,7 +465,10 @@ export const clearCartStorage = (userId: number) => {
   saveCart(filtered);
 };
 
+// ============================================
 // ============ ЗАКАЗЫ ============
+// ============================================
+
 export const getOrders = (): Order[] => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.ORDERS) || '[]');
 };
@@ -432,7 +522,10 @@ export const updateOrderStatus = (orderId: string, status: Order['status']) => {
   }
 };
 
+// ============================================
 // ============ КАТЕГОРИИ ============
+// ============================================
+
 export const getCategories = (): Category[] => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.CATEGORIES) || '[]');
 };
@@ -470,7 +563,10 @@ export const deleteCategory = (id: number): boolean => {
   return filtered.length !== categories.length;
 };
 
+// ============================================
 // ============ ПРОМОКОДЫ ============
+// ============================================
+
 export const getPromocodes = (): Promocode[] => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.PROMOCODES) || '[]');
 };
@@ -509,7 +605,10 @@ export const deletePromocode = (id: number): boolean => {
   return filtered.length !== promocodes.length;
 };
 
+// ============================================
 // ============ ОТЗЫВЫ ============
+// ============================================
+
 export const getProductReviews = (productId: number): Review[] => {
   const reviews = JSON.parse(localStorage.getItem(STORAGE_KEYS.REVIEWS) || '[]');
   return reviews.filter((r: Review) => r.productId === productId);
@@ -544,7 +643,10 @@ export const addReview = (userId: number, productId: number, rating: number, com
   return newReview;
 };
 
+// ============================================
 // ============ ИЗБРАННОЕ ============
+// ============================================
+
 export const getFavorites = (userId: number): number[] => {
   const favorites = JSON.parse(localStorage.getItem(STORAGE_KEYS.FAVORITES) || '[]');
   return favorites.filter((f: Favorite) => f.userId === userId).map((f: Favorite) => f.productId);
@@ -565,7 +667,10 @@ export const toggleFavorite = (userId: number, productId: number): boolean => {
   }
 };
 
+// ============================================
 // ============ ЧАТ ============
+// ============================================
+
 export const getChatMessages = (): Message[] => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES) || '[]');
 };
@@ -601,7 +706,10 @@ export const getUserUnreadCount = (userId: number): number => {
   return messages.filter(msg => msg.userId === userId && !msg.isAdmin && !msg.isRead).length;
 };
 
+// ============================================
 // ============ ПОДАРОЧНЫЕ СЕРТИФИКАТЫ ============
+// ============================================
+
 export const getGiftCards = () => {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.GIFT_CARDS) || '[]');
 };
@@ -612,7 +720,10 @@ export const addGiftCard = (card: any) => {
   localStorage.setItem(STORAGE_KEYS.GIFT_CARDS, JSON.stringify(cards));
 };
 
+// ============================================
 // ============ СТАТИСТИКА ============
+// ============================================
+
 export const getStats = () => {
   const products = getProducts();
   const orders = getAllOrders();

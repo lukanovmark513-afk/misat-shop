@@ -45,47 +45,146 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-gradient-to-b from-[#0a0a0a] to-black border-t border-white/10">
+    <footer style={{
+      background: 'linear-gradient(to bottom, rgba(10,10,10,0.8), #000)',
+      borderTop: '1px solid rgba(255,255,255,0.06)'
+    }}>
 
       {/* ========== МОБИЛЬНАЯ ВЕРСИЯ (до 768px) ========== */}
-    <div className="md:hidden px-4 pt-4 pb-20 text-center">
-      <Link to="/" className="inline-block text-sm font-bold tracking-wider text-white/60 hover:text-white">
-        MISAT
-      </Link>
-      <div className="flex justify-center gap-4 text-[9px]">
-        {mobileNavLinks.map((link) => (
-          <Link key={link.to} to={link.to} className="text-gray-500 hover:text-white transition">
-            {link.label}
-          </Link>
-        ))}
+      <div className="md:hidden px-4 pt-6 pb-20 text-center">
+        <Link to="/" style={{
+          display: 'inline-block',
+          fontSize: '16px',
+          fontWeight: 600,
+          letterSpacing: '-0.04em',
+          color: 'rgba(255,255,255,0.5)',
+          textDecoration: 'none',
+          transition: 'color 0.2s ease'
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+        >
+          MISAT
+        </Link>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 16,
+          marginTop: 8
+        }}>
+          {mobileNavLinks.map((link) => (
+            <Link key={link.to} to={link.to} style={{
+              color: 'rgba(255,255,255,0.3)',
+              fontSize: '10px',
+              textDecoration: 'none',
+              fontWeight: 500,
+              letterSpacing: '0.02em',
+              transition: 'color 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
       </div>
-    </div>
 
       {/* ========== ПК ВЕРСИЯ (от 768px) ========== */}
       <div className="hidden md:block px-4 md:px-6 lg:px-8 py-10">
         <div className="max-w-[1400px] mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
 
-            {/* Brand */}
+            {/* Brand - iOS Style */}
             <div className="col-span-2 md:col-span-1">
-              <Link to="/" className="inline-block mb-3">
-                <span className="text-2xl font-black tracking-tighter text-white">MISAT</span>
+              <Link to="/" style={{
+                display: 'inline-block',
+                marginBottom: 12,
+                textDecoration: 'none'
+              }}>
+                <span style={{
+                  fontSize: '24px',
+                  fontWeight: 600,
+                  letterSpacing: '-0.04em',
+                  color: '#fff'
+                }}>MISAT</span>
               </Link>
-              <p className="text-gray-400 text-sm mb-3">Минимализм. Качество. Стиль.</p>
-              <div className="space-y-1 text-xs text-gray-500">
-                <div className="flex items-center gap-2"><i className="fas fa-map-marker-alt text-white/30"></i><span>Смоленск, Россия</span></div>
-                <div className="flex items-center gap-2"><i className="fas fa-envelope text-white/30"></i><a href="mailto:info@misat.ru" className="hover:text-white transition">info@misat.ru</a></div>
-                <div className="flex items-center gap-2"><i className="fas fa-phone text-white/30"></i><a href="tel:+79938843766" className="hover:text-white transition">+7 (993) 884-37-66</a></div>
+              <p style={{
+                color: 'rgba(255,255,255,0.3)',
+                fontSize: '13px',
+                marginBottom: 12,
+                fontWeight: 400
+              }}>Минимализм. Качество. Стиль.</p>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                fontSize: '11px',
+                color: 'rgba(255,255,255,0.25)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-map-marker-alt" style={{ color: 'rgba(255,255,255,0.2)', fontSize: '10px' }} />
+                  <span>Смоленск, Россия</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-envelope" style={{ color: 'rgba(255,255,255,0.2)', fontSize: '10px' }} />
+                  <a href="mailto:info@misat.ru" style={{
+                    color: 'rgba(255,255,255,0.25)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
+                  >
+                    info@misat.ru
+                  </a>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-phone" style={{ color: 'rgba(255,255,255,0.2)', fontSize: '10px' }} />
+                  <a href="tel:+79938843766" style={{
+                    color: 'rgba(255,255,255,0.25)',
+                    textDecoration: 'none',
+                    transition: 'color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
+                  >
+                    +7 (993) 884-37-66
+                  </a>
+                </div>
               </div>
             </div>
 
             {/* Каталог */}
             <div>
-              <h4 className="font-bold mb-3 text-xs uppercase tracking-wider text-white/60">Каталог</h4>
-              <ul className="space-y-1.5">
+              <h4 style={{
+                fontWeight: 600,
+                marginBottom: 12,
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase'
+              }}>Каталог</h4>
+              <ul style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                listStyle: 'none',
+                padding: 0,
+                margin: 0
+              }}>
                 {links.catalog.map(link => (
                   <li key={link.to}>
-                    <Link to={link.to} className={`text-gray-400 text-sm hover:text-white transition ${link.sale ? 'text-red-400 hover:text-red-300' : ''}`}>
+                    <Link to={link.to} style={{
+                      color: link.sale ? 'rgba(255,69,58,0.7)' : 'rgba(255,255,255,0.4)',
+                      fontSize: '13px',
+                      textDecoration: 'none',
+                      fontWeight: 400,
+                      transition: 'color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = link.sale ? 'rgba(255,69,58,0.9)' : 'rgba(255,255,255,0.7)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = link.sale ? 'rgba(255,69,58,0.7)' : 'rgba(255,255,255,0.4)'}
+                    >
                       {link.label}
                     </Link>
                   </li>
@@ -95,49 +194,206 @@ const Footer = () => {
 
             {/* Информация */}
             <div>
-              <h4 className="font-bold mb-3 text-xs uppercase tracking-wider text-white/60">Информация</h4>
-              <ul className="space-y-1.5">
+              <h4 style={{
+                fontWeight: 600,
+                marginBottom: 12,
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase'
+              }}>Информация</h4>
+              <ul style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                listStyle: 'none',
+                padding: 0,
+                margin: 0
+              }}>
                 {links.info.map(link => (
-                  <li key={link.to}><Link to={link.to} className="text-gray-400 text-sm hover:text-white transition">{link.label}</Link></li>
+                  <li key={link.to}>
+                    <Link to={link.to} style={{
+                      color: 'rgba(255,255,255,0.4)',
+                      fontSize: '13px',
+                      textDecoration: 'none',
+                      fontWeight: 400,
+                      transition: 'color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
                 ))}
               </ul>
             </div>
 
             {/* Поддержка */}
             <div>
-              <h4 className="font-bold mb-3 text-xs uppercase tracking-wider text-white/60">Поддержка</h4>
-              <ul className="space-y-1.5">
+              <h4 style={{
+                fontWeight: 600,
+                marginBottom: 12,
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase'
+              }}>Поддержка</h4>
+              <ul style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                listStyle: 'none',
+                padding: 0,
+                margin: 0
+              }}>
                 {links.support.map(link => (
-                  <li key={link.to}><Link to={link.to} className="text-gray-400 text-sm hover:text-white transition">{link.label}</Link></li>
+                  <li key={link.to}>
+                    <Link to={link.to} style={{
+                      color: 'rgba(255,255,255,0.4)',
+                      fontSize: '13px',
+                      textDecoration: 'none',
+                      fontWeight: 400,
+                      transition: 'color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
                 ))}
               </ul>
             </div>
 
-            {/* Соцсети и оплата */}
+            {/* Соцсети и оплата - iOS Style */}
             <div>
-              <h4 className="font-bold mb-3 text-xs uppercase tracking-wider text-white/60">Мы в соцсетях</h4>
-              <div className="flex gap-3 mb-4">
+              <h4 style={{
+                fontWeight: 600,
+                marginBottom: 12,
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase'
+              }}>Мы в соцсетях</h4>
+              <div style={{
+                display: 'flex',
+                gap: 10,
+                marginBottom: 16
+              }}>
                 {socials.map(social => (
-                  <a key={social.icon} href={social.href} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition text-lg">
+                  <a
+                    key={social.icon}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.04)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'rgba(255,255,255,0.3)',
+                      fontSize: '16px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
                     <i className={`fab ${social.icon}`}></i>
                   </a>
                 ))}
               </div>
-              <h4 className="font-bold mb-2 text-xs uppercase tracking-wider text-white/60">Принимаем к оплате</h4>
-              <div className="flex gap-2 text-xl">
-                {payments.map(payment => <i key={payment} className={`fab ${payment} text-gray-500`}></i>)}
+
+              <h4 style={{
+                fontWeight: 600,
+                marginBottom: 8,
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase'
+              }}>Принимаем к оплате</h4>
+              <div style={{
+                display: 'flex',
+                gap: 8,
+                fontSize: '18px'
+              }}>
+                {payments.map(payment => (
+                  <i key={payment} className={`fab ${payment}`} style={{
+                    color: 'rgba(255,255,255,0.2)',
+                    transition: 'color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                  />
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Реквизиты и копирайт */}
-          <div className="border-t border-white/10 pt-5 text-center text-xs text-gray-500 space-y-2">
-            <p>MISAT | ИНН: 673111219228 | Режим налогообложения: Самозанятый</p>
-            <p>© {currentYear} MISAT. Все права защищены.</p>
-            <div className="flex justify-center gap-4 flex-wrap">
-              <Link to="/privacy" className="hover:text-white transition">Политика конфиденциальности</Link>
-              <Link to="/terms" className="hover:text-white transition">Пользовательское соглашение</Link>
-              <Link to="/offer" className="hover:text-white transition">Публичная оферта</Link>
+          {/* Реквизиты и копирайт - iOS Style */}
+          <div style={{
+            borderTop: '1px solid rgba(255,255,255,0.04)',
+            paddingTop: 20,
+            textAlign: 'center',
+            fontSize: '11px',
+            color: 'rgba(255,255,255,0.15)'
+          }}>
+            <p style={{ margin: '0 0 4px' }}>MISAT | ИНН: 673111219228 | Режим налогообложения: Самозанятый</p>
+            <p style={{ margin: '0 0 8px' }}>© {currentYear} MISAT. Все права защищены.</p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 16,
+              flexWrap: 'wrap'
+            }}>
+              <Link to="/privacy" style={{
+                color: 'rgba(255,255,255,0.15)',
+                textDecoration: 'none',
+                fontSize: '11px',
+                transition: 'color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.15)'}
+              >
+                Политика конфиденциальности
+              </Link>
+              <Link to="/terms" style={{
+                color: 'rgba(255,255,255,0.15)',
+                textDecoration: 'none',
+                fontSize: '11px',
+                transition: 'color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.15)'}
+              >
+                Пользовательское соглашение
+              </Link>
+              <Link to="/offer" style={{
+                color: 'rgba(255,255,255,0.15)',
+                textDecoration: 'none',
+                fontSize: '11px',
+                transition: 'color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.15)'}
+              >
+                Публичная оферта
+              </Link>
             </div>
           </div>
         </div>

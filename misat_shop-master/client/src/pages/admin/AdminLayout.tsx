@@ -26,17 +26,17 @@ const AdminLayout = () => {
   }, []);
 
   const menuItems = [
-    { path: '/admin', label: 'Дашборд', icon: 'fa-chart-line' },
-    { path: '/admin/products', label: 'Товары', icon: 'fa-box' },
-    { path: '/admin/orders', label: 'Заказы', icon: 'fa-truck' },
-    { path: '/admin/categories', label: 'Категории', icon: 'fa-tags' },
-    { path: '/admin/users', label: 'Пользователи', icon: 'fa-users' },
-    { path: '/admin/promocodes', label: 'Промокоды', icon: 'fa-tag' },
+    { path: '/admin', label: 'Р”Р°С€Р±РѕСЂРґ', icon: 'fa-chart-line' },
+    { path: '/admin/products', label: 'РўРѕРІР°СЂС‹', icon: 'fa-box' },
+    { path: '/admin/orders', label: 'Р—Р°РєР°Р·С‹', icon: 'fa-truck' },
+    { path: '/admin/categories', label: 'РљР°С‚РµРіРѕСЂРёРё', icon: 'fa-tags' },
+    { path: '/admin/users', label: 'РџРѕР»СЊР·РѕРІР°С‚РµР»Рё', icon: 'fa-users' },
+    { path: '/admin/promocodes', label: 'РџСЂРѕРјРѕРєРѕРґС‹', icon: 'fa-tag' },
   ];
 
   if (!user || user.role !== 'admin') {
     navigate('/');
-    toast.error('У вас нет доступа к админ-панели');
+    toast.error('РЈ РІР°СЃ РЅРµС‚ РґРѕСЃС‚СѓРїР° Рє Р°РґРјРёРЅ-РїР°РЅРµР»Рё');
     return null;
   }
 
@@ -50,7 +50,7 @@ const AdminLayout = () => {
         <i className={`fas fa-${isSidebarOpen ? 'times' : 'bars'} text-base`}></i>
       </button>
 
-      {/* Sidebar - тёмный стиль */}
+      {/* Sidebar - С‚С‘РјРЅС‹Р№ СЃС‚РёР»СЊ */}
       <aside className={`fixed left-0 top-0 h-full bg-black border-r border-white/10 transition-all duration-300 z-40 ${
         isSidebarOpen ? 'w-64' : 'w-20'
       } overflow-hidden`}>
@@ -98,12 +98,12 @@ const AdminLayout = () => {
               onClick={() => {
                 dispatch(logout());
                 navigate('/');
-                toast.success('Вы вышли из админ-панели');
+                toast.success('Р’С‹ РІС‹С€Р»Рё РёР· Р°РґРјРёРЅ-РїР°РЅРµР»Рё');
               }}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-white/5 transition-all duration-200"
             >
               <i className="fas fa-sign-out-alt w-4 text-sm text-gray-500"></i>
-              {isSidebarOpen && <span className="text-xs text-gray-500">Выйти</span>}
+              {isSidebarOpen && <span className="text-xs text-gray-500">Р’С‹Р№С‚Рё</span>}
             </button>
           </div>
         </div>

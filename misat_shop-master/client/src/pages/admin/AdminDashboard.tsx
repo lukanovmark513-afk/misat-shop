@@ -1,6 +1,25 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getProducts, getAllOrders, getUsers } from '../../services/storageService';
+
+// ============================================
+// ЦВЕТОВАЯ ПАЛИТРА — тёмный архив
+// ============================================
+const COLORS = {
+  bg: '#0a0a0b',
+  bgCard: '#111113',
+  bgElevated: '#161619',
+  ink: '#e8e4dd',
+  inkSoft: 'rgba(232, 228, 221, 0.62)',
+  inkFaint: 'rgba(232, 228, 221, 0.38)',
+  stamp: '#b8937a',
+  stampDark: '#8b6f5a',
+  olive: '#7a8a7a',
+  rule: 'rgba(232, 228, 221, 0.08)',
+  ruleStrong: 'rgba(232, 228, 221, 0.15)',
+  gold: '#b8a088',
+  goldLight: '#d4c4b0',
+};
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -87,67 +106,90 @@ const AdminDashboard = () => {
 
   const maxAmount = Math.max(...salesData.map(d => d.amount), 1);
 
-  const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
-    processing: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-    shipped: 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
-    delivered: 'bg-green-500/20 text-green-400 border border-green-500/30',
-    cancelled: 'bg-red-500/20 text-red-400 border border-red-500/30'
+  const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+    pending: { bg: 'rgba(196, 176, 74, 0.15)', text: '#c4b04a', border: 'rgba(196, 176, 74, 0.3)' },
+    processing: { bg: 'rgba(74, 106, 138, 0.15)', text: '#8ab4c4', border: 'rgba(138, 180, 196, 0.3)' },
+    shipped: { bg: 'rgba(122, 90, 138, 0.15)', text: '#b4a0c4', border: 'rgba(180, 160, 196, 0.3)' },
+    delivered: { bg: 'rgba(106, 138, 106, 0.15)', text: '#8ac48a', border: 'rgba(138, 196, 138, 0.3)' },
+    cancelled: { bg: 'rgba(138, 74, 74, 0.15)', text: '#c48a8a', border: 'rgba(196, 138, 138, 0.3)' }
   };
 
   const statusNames: Record<string, string> = {
-    pending: 'Ожидает',
-    processing: 'В обработке',
-    shipped: 'Отправлен',
-    delivered: 'Доставлен',
-    cancelled: 'Отменён'
+    pending: 'ОЖИДАЕТ',
+    processing: 'В ОБРАБОТКЕ',
+    shipped: 'ОТПРАВЛЕН',
+    delivered: 'ДОСТАВЛЕН',
+    cancelled: 'ОТМЕНЁН'
   };
 
+  const statCards = [
+    { icon: 'fa-box', label: 'ТОВАРЫ', value: stats.totalProducts, color: COLORS.ink },
+    { icon: 'fa-shopping-cart', label: 'ЗАКАЗЫ', value: stats.totalOrders, color: COLORS.gold },
+    { icon: 'fa-users', label: 'ПОЛЬЗОВАТЕЛИ', value: stats.totalUsers, color: COLORS.ink },
+    { icon: 'fa-ruble-sign', label: 'ВЫРУЧКА', value: `${stats.totalRevenue.toLocaleString()} ₽`, color: COLORS.goldLight },
+    { icon: 'fa-clock', label: 'В ОБРАБОТКЕ', value: stats.pendingOrders, color: '#c4b04a' },
+    { icon: 'fa-exclamation-triangle', label: 'НИЗКИЙ ЗАПАС', value: stats.lowStock, color: '#c48a8a' },
+  ];
+
   return (
-    <div>
+    <div style={{ backgroundColor: COLORS.bg, minHeight: '100vh', color: COLORS.ink }}>
+      {/* Заголовок */}
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-6 h-px bg-white/40"></div>
-          <span className="text-gray-400 text-[8px] md:text-[10px] tracking-[0.2em]">АДМИН</span>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-px" style={{ backgroundColor: COLORS.stamp }}></div>
+          <span className="text-[10px] tracking-[0.3em]" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+            АДМИНИСТРИРОВАНИЕ
+          </span>
         </div>
-        <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white">ДАШБОРД</h1>
+        <h1 className="text-2xl md:text-3xl font-black tracking-tighter" style={{ fontFamily: 'Anton, sans-serif', color: COLORS.ink }}>
+          ДАШБОРД
+        </h1>
       </div>
 
+      {/* Карточки статистики */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {[
-          { icon: 'fa-box', label: 'ТОВАРЫ', value: stats.totalProducts },
-          { icon: 'fa-shopping-cart', label: 'ЗАКАЗЫ', value: stats.totalOrders },
-          { icon: 'fa-users', label: 'ПОЛЬЗОВАТЕЛИ', value: stats.totalUsers },
-          { icon: 'fa-ruble-sign', label: 'ВЫРУЧКА', value: stats.totalRevenue.toLocaleString() + ' ₽' },
-          { icon: 'fa-clock', label: 'В ОБРАБОТКЕ', value: stats.pendingOrders },
-          { icon: 'fa-exclamation-triangle', label: 'НИЗКИЙ ЗАПАС', value: stats.lowStock },
-        ].map((item, idx) => (
-          <div key={idx} className="bg-white/5 rounded-xl p-3 border border-white/10 text-center">
-            <i className={`fas ${item.icon} text-white/30 text-lg mb-1`}></i>
-            <p className="text-gray-500 text-[9px] tracking-wider">{item.label}</p>
-            <p className="text-white text-xl font-bold">{item.value}</p>
+        {statCards.map((item, idx) => (
+          <div
+            key={idx}
+            className="rounded p-3 text-center transition hover:scale-[1.02]"
+            style={{
+              backgroundColor: COLORS.bgCard,
+              border: `1px solid ${COLORS.rule}`,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            }}
+          >
+            <i className={`fas ${item.icon} text-lg mb-1`} style={{ color: item.color, opacity: 0.6 }}></i>
+            <p className="text-[9px] tracking-wider mb-1" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+              {item.label}
+            </p>
+            <p className="text-lg font-bold" style={{ color: item.color, fontFamily: 'JetBrains Mono, monospace' }}>
+              {item.value}
+            </p>
           </div>
         ))}
       </div>
 
       {/* График */}
-      <div className="bg-white/5 rounded-xl border border-white/10 p-5 mb-6">
+      <div className="rounded p-5 mb-6" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
         <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-          <h2 className="text-white font-bold text-sm">ПРОДАЖИ</h2>
-          <div className="flex gap-1">
+          <h2 className="text-sm font-bold tracking-wider" style={{ fontFamily: 'JetBrains Mono, monospace', color: COLORS.ink }}>
+            📊 ПРОДАЖИ
+          </h2>
+          <div className="flex gap-1 p-0.5 rounded" style={{ backgroundColor: COLORS.bg, border: `1px solid ${COLORS.rule}` }}>
             {[
-              { id: 'week', label: 'Нед' },
-              { id: 'month', label: 'Мес' },
-              { id: 'year', label: 'Год' }
+              { id: 'week', label: 'НЕДЕЛЯ' },
+              { id: 'month', label: 'МЕСЯЦ' },
+              { id: 'year', label: 'ГОД' }
             ].map(period => (
               <button
                 key={period.id}
                 onClick={() => setChartPeriod(period.id as 'week' | 'month' | 'year')}
-                className={`px-3 py-1 rounded-full text-[10px] font-bold transition ${
-                  chartPeriod === period.id
-                    ? 'bg-white text-black'
-                    : 'bg-white/10 text-gray-400 hover:bg-white/20'
-                }`}
+                className="px-3 py-1 rounded text-[9px] font-bold transition"
+                style={{
+                  fontFamily: 'JetBrains Mono, monospace',
+                  backgroundColor: chartPeriod === period.id ? COLORS.ink : 'transparent',
+                  color: chartPeriod === period.id ? COLORS.bg : COLORS.inkFaint,
+                }}
               >
                 {period.label}
               </button>
@@ -156,63 +198,134 @@ const AdminDashboard = () => {
         </div>
 
         {salesData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-gray-500 text-sm">Нет данных</div>
+          <div className="h-48 flex items-center justify-center text-sm" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+            НЕТ ДАННЫХ
+          </div>
         ) : (
           <div className="h-48 flex items-end gap-1">
-            {salesData.map((data, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center group">
-                <div className="w-full bg-white/20 rounded-t transition-all duration-300 group-hover:bg-white/40" style={{ height: `${Math.max((data.amount / maxAmount) * 120, 2)}px` }} />
-                <p className="text-[8px] text-gray-600 mt-1">{data.date}</p>
-                <p className="text-[7px] text-white/40 opacity-0 group-hover:opacity-100 transition">{data.amount.toLocaleString()} ₽</p>
-              </div>
-            ))}
+            {salesData.map((data, idx) => {
+              const height = Math.max((data.amount / maxAmount) * 120, 2);
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center group">
+                  <div
+                    className="w-full rounded-t transition-all duration-300"
+                    style={{
+                      height: `${height}px`,
+                      background: data.amount > 0
+                        ? `linear-gradient(to top, ${COLORS.stamp}40, ${COLORS.stamp}20)`
+                        : `${COLORS.rule}`,
+                    }}
+                  />
+                  <p className="text-[8px] mt-1" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {data.date}
+                  </p>
+                  <p className="text-[7px] opacity-0 group-hover:opacity-100 transition" style={{ color: COLORS.goldLight, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {data.amount.toLocaleString()} ₽
+                  </p>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
+      {/* Последние заказы и новые товары */}
       <div className="grid md:grid-cols-2 gap-5">
-        <div className="bg-white/5 rounded-xl border border-white/10 p-5">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-white font-bold text-sm">ПОСЛЕДНИЕ ЗАКАЗЫ</h2>
-            <Link to="/admin/orders" className="text-gray-500 text-[10px] hover:text-white transition">ВСЕ →</Link>
+        {/* Заказы */}
+        <div className="rounded p-5" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+          <div className="flex justify-between items-center mb-4 pb-3" style={{ borderBottom: `1px dashed ${COLORS.ruleStrong}` }}>
+            <h2 className="text-sm font-bold tracking-wider" style={{ fontFamily: 'JetBrains Mono, monospace', color: COLORS.ink }}>
+              🛒 ПОСЛЕДНИЕ ЗАКАЗЫ
+            </h2>
+            <Link to="/admin/orders" className="text-[10px] transition" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+              ВСЕ →
+            </Link>
           </div>
           <div className="space-y-2">
-            {recentOrders.map(order => (
-              <div key={order.id} className="flex items-center justify-between border-b border-white/5 pb-2">
-                <div>
-                  <p className="text-white text-xs font-mono">#{order.id}</p>
-                  <p className="text-gray-500 text-[9px]">{order.items?.length || 0} товаров</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-white text-xs font-bold">{order.total.toLocaleString()} ₽</p>
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-medium ${statusColors[order.status]}`}>{statusNames[order.status]}</span>
-                </div>
-              </div>
-            ))}
+            {recentOrders.length === 0 ? (
+              <p className="text-center py-8 text-xs" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                НЕТ ЗАКАЗОВ
+              </p>
+            ) : (
+              recentOrders.map(order => {
+                const statusStyle = statusColors[order.status] || statusColors.pending;
+                return (
+                  <div key={order.id} className="flex items-center justify-between py-2" style={{ borderBottom: `1px solid ${COLORS.rule}` }}>
+                    <div>
+                      <p className="text-xs" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>
+                        №{order.id}
+                      </p>
+                      <p className="text-[9px]" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                        {order.items?.length || 0} ТОВАРОВ
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>
+                        {order.total.toLocaleString()} ₽
+                      </p>
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[8px] font-medium"
+                        style={{
+                          backgroundColor: statusStyle.bg,
+                          color: statusStyle.text,
+                          border: `1px solid ${statusStyle.border}`,
+                          fontFamily: 'JetBrains Mono, monospace',
+                        }}
+                      >
+                        {statusNames[order.status]}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
-        <div className="bg-white/5 rounded-xl border border-white/10 p-5">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-white font-bold text-sm">НОВЫЕ ТОВАРЫ</h2>
-            <Link to="/admin/products" className="text-gray-500 text-[10px] hover:text-white transition">ВСЕ →</Link>
+        {/* Товары */}
+        <div className="rounded p-5" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+          <div className="flex justify-between items-center mb-4 pb-3" style={{ borderBottom: `1px dashed ${COLORS.ruleStrong}` }}>
+            <h2 className="text-sm font-bold tracking-wider" style={{ fontFamily: 'JetBrains Mono, monospace', color: COLORS.ink }}>
+              📦 НОВЫЕ ТОВАРЫ
+            </h2>
+            <Link to="/admin/products" className="text-[10px] transition" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+              ВСЕ →
+            </Link>
           </div>
           <div className="space-y-2">
-            {recentProducts.map(product => (
-              <div key={product.id} className="flex items-center justify-between border-b border-white/5 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center"><i className="fas fa-box text-white/30 text-xs"></i></div>
-                  <div>
-                    <p className="text-white text-xs font-medium">{product.name}</p>
-                    <p className="text-gray-500 text-[9px]">{product.price.toLocaleString()} ₽</p>
+            {recentProducts.length === 0 ? (
+              <p className="text-center py-8 text-xs" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                НЕТ ТОВАРОВ
+              </p>
+            ) : (
+              recentProducts.map(product => (
+                <div key={product.id} className="flex items-center justify-between py-2" style={{ borderBottom: `1px solid ${COLORS.rule}` }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: COLORS.bg, border: `1px solid ${COLORS.rule}` }}>
+                      <i className="fas fa-box text-xs" style={{ color: COLORS.inkFaint }}></i>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium line-clamp-1" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>
+                        {product.name}
+                      </p>
+                      <p className="text-[9px]" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                        {product.price.toLocaleString()} ₽
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px]" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                      ОСТАТОК: {product.stock}
+                    </p>
+                    {product.isNew && (
+                      <span className="text-[8px] font-bold" style={{ color: COLORS.olive, fontFamily: 'JetBrains Mono, monospace' }}>
+                        NEW
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-gray-500 text-[9px]">Остаток: {product.stock}</p>
-                  {product.isNew && <span className="text-green-400 text-[8px]">NEW</span>}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { getUsers, saveUsers, User } from '../../services/storageService';
 import toast from 'react-hot-toast';
 
@@ -91,7 +91,7 @@ const AdminUsers = () => {
                       <p className="text-white font-medium">{user.first_name} {user.last_name}</p>
                       {user.id === 1 && <span className="text-[10px] text-blue-400">Главный админ</span>}
                     </div>
-                   </td>
+                  </td>
                   <td className="px-5 py-4 text-sm text-gray-300">{user.email}</td>
                   <td className="px-5 py-4 text-sm text-gray-400">{user.phone || '—'}</td>
                   <td className="px-5 py-4">
@@ -107,10 +107,10 @@ const AdminUsers = () => {
                       <option value="user" className="bg-[#0a0a0a]">Пользователь</option>
                       <option value="admin" className="bg-[#0a0a0a]">Администратор</option>
                     </select>
-                   </td>
+                  </td>
                   <td className="px-5 py-4 text-sm text-gray-500">
                     {new Date(user.created_at).toLocaleDateString()}
-                   </td>
+                  </td>
                   <td className="px-5 py-4">
                     <button
                       onClick={() => handleDeleteUser(user.id)}
@@ -119,7 +119,7 @@ const AdminUsers = () => {
                     >
                       <i className="fas fa-trash"></i>
                     </button>
-                   </td>
+                  </td>
                 </tr>
               ))}
             </tbody>

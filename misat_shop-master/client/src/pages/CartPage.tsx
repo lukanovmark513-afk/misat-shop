@@ -1,38 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // ← исправлено: react-router-dom
 import { useDispatch, useSelector } from 'react-redux';
 import { removeFromCartAsync, updateCartItemAsync, clearCartAsync, fetchCart } from '../store/slices/cartSlice';
 import { AppDispatch } from '../store';
 import toast from 'react-hot-toast';
 
+// ============================================
+// СТИЛИ
+// ============================================
+const glassCard =
+  "bg-white/5 backdrop-blur-2xl border border-white/10 " +
+  "rounded-2xl hover:border-white/20 transition-all duration-300";
+
+const glassPanel =
+  "bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl";
+
+const btnPrimary =
+  "w-full h-14 rounded-xl bg-white text-black font-bold " +
+  "hover:bg-gray-200 transition active:scale-[0.98]";
+
+// ============================================
+// КОМПОНЕНТ
+// ============================================
 const CartPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
-  const cartItems = useSelector((state: any) => state.cart.items);
+  const cartItems = useSelector((state: any) => state.cart.items || []);
+  const cartInitialized = useSelector((state: any) => state.cart.initialized || false);
   const { isAuthenticated } = useSelector((state: any) => state.auth);
-  const [isMobile, setIsMobile] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!cartInitialized);
   const [updatingItem, setUpdatingItem] = useState<number | null>(null);
 
+  // ============================================
+  // ИНИЦИАЛИЗАЦИЯ КОРЗИНЫ
+  // ============================================
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
+    let mounted = true;
 
     const loadCart = async () => {
-      if (isAuthenticated) {
-        await dispatch(fetchCart());
+      if (cartInitialized) {
+        if (mounted) setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+
+      try {
+        if (isAuthenticated) {
+          await dispatch(fetchCart());
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки корзины:', error);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
     };
+
     loadCart();
 
-    return () => window.removeEventListener('resize', checkMobile);
-  }, [dispatch, isAuthenticated]);
+    return () => {
+      mounted = false;
+    };
+  }, [dispatch, isAuthenticated, cartInitialized]);
 
+  // ============================================
+  // РАСЧЁТЫ
+  // ============================================
   const totalPrice = cartItems.reduce((sum: number, item: any) => {
     const price = item?.price || 0;
     const quantity = item?.quantity || 0;
@@ -40,6 +72,10 @@ const CartPage = () => {
   }, 0);
 
   const calculateDelivery = (items: any[]) => {
+    if (!items || items.length === 0) {
+      return { price: 0, text: 'Нет товаров', days: '—' };
+    }
+
     let hasInStock = false;
     let hasPreorder = false;
     let preorderDays = 0;
@@ -74,6 +110,8 @@ const CartPage = () => {
   };
 
   const calculatePrepayment = (items: any[]) => {
+    if (!items || items.length === 0) return 0;
+
     let prepaymentTotal = 0;
     items.forEach(item => {
       const itemTotal = item.price * item.quantity;
@@ -89,22 +127,40 @@ const CartPage = () => {
   const prepaymentAmount = calculatePrepayment(cartItems);
   const remainingAmount = finalPrice - prepaymentAmount;
 
+  // ============================================
+  // ОБРАБОТЧИКИ
+  // ============================================
   const handleUpdateQuantity = async (id: number, quantity: number) => {
     if (quantity < 1) return;
     setUpdatingItem(id);
-    await dispatch(updateCartItemAsync({ itemId: id, quantity }));
+    try {
+      await dispatch(updateCartItemAsync({ itemId: id, quantity }));
+    } catch (error) {
+      console.error('Ошибка обновления количества:', error);
+      toast.error('Не удалось обновить количество');
+    }
     setUpdatingItem(null);
   };
 
   const handleRemove = async (id: number, name: string) => {
-    await dispatch(removeFromCartAsync(id));
-    toast.error(`${name} удалён из корзины`);
+    try {
+      await dispatch(removeFromCartAsync(id));
+      toast.success(`${name} удалён из корзины`);
+    } catch (error) {
+      console.error('Ошибка удаления:', error);
+      toast.error('Не удалось удалить товар');
+    }
   };
 
   const handleClearCart = async () => {
-    await dispatch(clearCartAsync());
-    setShowClearModal(false);
-    toast.success('Корзина очищена');
+    try {
+      await dispatch(clearCartAsync());
+      setShowClearModal(false);
+      toast.success('Корзина очищена');
+    } catch (error) {
+      console.error('Ошибка очистки корзины:', error);
+      toast.error('Не удалось очистить корзину');
+    }
   };
 
   const handleCheckout = () => {
@@ -116,233 +172,281 @@ const CartPage = () => {
     navigate('/checkout');
   };
 
+  // ============================================
+  // LOADING
+  // ============================================
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] pt-20 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto">
-            <div className="absolute inset-0 border-2 border-white/20 rounded-full"></div>
-            <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p className="text-gray-500 text-xs tracking-wider mt-4 animate-pulse">ЗАГРУЗКА</p>
+      <div className="min-h-screen bg-[#050505] pt-20 flex items-center justify-center">
+        <div className="relative w-16 h-16 mx-auto">
+          <div className="absolute inset-0 border-2 border-white/20 rounded-full"></div>
+          <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
         </div>
       </div>
     );
   }
 
+  // ============================================
+  // EMPTY CART - премиальный дизайн
+  // ============================================
   if (!cartItems || cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] pt-20">
-        <div className="w-full px-4 md:px-8 lg:px-16 py-12">
-          <div className="max-w-md mx-auto text-center">
-            <div className="w-20 h-20 mx-auto bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-              <i className="fas fa-shopping-cart text-white/40 text-3xl"></i>
-            </div>
-            <h2 className="text-2xl font-black text-white mb-3">КОРЗИНА ПУСТА</h2>
-            <p className="text-gray-400 text-sm mb-8">Добавьте товары в корзину, чтобы продолжить</p>
-            <Link to="/catalog" className="inline-block bg-white text-black px-8 py-3 font-bold text-sm tracking-wider hover:bg-white/90 transition rounded-xl">
-              ПЕРЕЙТИ В КАТАЛОГ
+      <div className="min-h-screen bg-[#050505] text-white pt-12 md:pt-20 pb-28 relative overflow-hidden">
+        {/* Background FX */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[#050505]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%)]" />
+          <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 md:px-8 lg:px-16 py-4 md:py-8">
+          {/* Хлебные крошки */}
+          <div className="text-xs text-gray-500 mt-6 md:mt-0 mb-4 md:mb-6">
+            <Link
+              to="/"
+              className="hover:text-white transition text-gray-400 md:text-gray-500 inline-block"
+            >
+              Главная
             </Link>
+            <span className="inline-block mx-1"> </span>
+            <i className="fas fa-chevron-right text-[9px] text-gray-600 inline-block"></i>
+            <span className="inline-block mx-1"> </span>
+            <span className="text-white/80 md:text-white inline-block">Корзина</span>
+          </div>
+
+          {/* Пустая корзина */}
+          <div className="max-w-md mx-auto text-center mt-2 md:mt-12">
+            <div className="relative">
+              <div className="w-28 h-28 md:w-32 md:h-32 mx-auto bg-white/5 rounded-full flex items-center justify-center mb-6 md:mb-8 relative">
+                <div className="absolute inset-0 bg-white/5 rounded-full animate-pulse"></div>
+                <div className="absolute inset-2 border border-white/10 rounded-full"></div>
+                <i className="fas fa-shopping-bag text-white/20 text-4xl md:text-5xl relative z-10"></i>
+              </div>
+            </div>
+
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white mb-3 md:mb-4">
+              КОРЗИНА ПУСТА
+            </h1>
+
+            <p className="text-gray-400 text-xs md:text-sm mb-6 md:mb-8 max-w-sm mx-auto">
+              Похоже, вы ещё не добавили ни одного товара. <br />
+              Откройте каталог и найдите что-то особенное.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/catalog"
+                className="inline-flex items-center justify-center gap-2 bg-white text-black px-6 md:px-8 py-3 md:py-3.5 font-bold text-xs md:text-sm tracking-wider hover:bg-white/90 transition rounded-xl"
+              >
+                <i className="fas fa-arrow-right text-xs md:text-sm"></i>
+                ПЕРЕЙТИ В КАТАЛОГ
+              </Link>
+
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center gap-2 border border-white/10 text-white/70 px-6 md:px-8 py-3 md:py-3.5 font-medium text-xs md:text-sm hover:bg-white/5 hover:text-white transition rounded-xl"
+              >
+                <i className="fas fa-home text-xs md:text-sm"></i>
+                НА ГЛАВНУЮ
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // ============================================
+  // RENDER - корзина с товарами
+  // ============================================
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pt-20">
-      <div className="w-full px-4 md:px-8 lg:px-16 py-8">
+    <div className="min-h-screen bg-[#050505] text-white pt-20 pb-28 relative overflow-hidden">
+      {/* Background FX */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[#050505]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%)]" />
+        <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:50px_50px]" />
+      </div>
 
-        {/* ========== БАННЕР КОРЗИНЫ (только ПК) ========== */}
-        <div className="hidden md:block rounded-xl md:rounded-2xl border border-white/10 mb-4 md:mb-6 overflow-hidden bg-black">
-          <div className="relative h-[140px] md:h-[300px] overflow-hidden">
-            <img
-              src="/images/brands/karzina.jpg"
-              alt="Корзина"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent"></div>
-          </div>
-        </div>
+      <div className="relative z-10 w-full px-4 md:px-8 lg:px-16 py-8">
 
-        {/* ========== ЗАГОЛОВОК ПОД БАННЕРОМ (везде) ========== */}
-        <div className="mb-6 md:mb-8 px-1">
+        {/* HEADER */}
+        <div className="mb-8 px-1">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-6 h-px bg-white/40"></div>
-            <span className="text-gray-400 text-[8px] md:text-[10px] tracking-[0.2em]">КОРЗИНА</span>
+            <div className="w-8 h-px bg-white/40"></div>
+            <span className="text-gray-400 text-[10px] tracking-[0.2em]">КОРЗИНА</span>
           </div>
-          <h1 className="text-2xl md:text-4xl font-black tracking-tighter text-white">
-            КОРЗИНА
-          </h1>
-          <p className="text-gray-500 text-[9px] md:text-xs mt-1">
+          <div className="flex items-end justify-between">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white">
+              КОРЗИНА
+            </h1>
+            {cartItems.length > 0 && (
+              <button
+                onClick={() => setShowClearModal(true)}
+                className="text-white/30 hover:text-red-400 transition text-xs tracking-wider"
+              >
+                ОЧИСТИТЬ
+              </button>
+            )}
+          </div>
+          <p className="text-gray-500 text-xs mt-1">
             {cartItems.length} товаров на сумму {totalPrice.toLocaleString()} ₽
           </p>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
 
-          {/* Левая колонка - Товары */}
-          <div className="flex-1">
-            {isMobile ? (
-              <div className="space-y-4">
-                {cartItems.map((item: any) => (
-                  <div key={item.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                    <div className="flex gap-3">
+          {/* LEFT - ТОВАРЫ */}
+          <div className="flex-1 space-y-4">
+            {cartItems.map((item: any) => {
+              const productId = item.productId || item.id;
+              const cartId = item.id || item.productId;
+              const itemName = item.name || 'Товар';
+              const itemPrice = item.price || 0;
+              const itemQuantity = item.quantity || 1;
+              const itemImage = item.image || 'https://placehold.co/100x100/1a1a1a/666666';
+              const itemSize = item.size || '—';
+              const itemStockType = item.stockType || 'in_stock';
+              const itemPreorderDays = item.preorderDays || 30;
+
+              // Проверяем, что productId - число
+              const productLink = `/product/${productId}`;
+
+              return (
+                <div
+                  key={cartId}
+                  className={`${glassCard} p-4 hover:scale-[1.01] group relative overflow-hidden`}
+                >
+                  {/* Вся карточка - ссылка на товар */}
+                  <Link
+                    to={productLink}
+                    className="absolute inset-0 z-0 rounded-2xl"
+                  />
+
+                  <div className="flex gap-4 relative z-10 pointer-events-none">
+                    {/* IMAGE */}
+                    <div className="w-24 h-24 rounded-xl overflow-hidden bg-white/5 flex-shrink-0">
                       <img
-                        src={item.image || 'https://placehold.co/100x100/1a1a1a/666666'}
-                        alt={item.name || 'Товар'}
-                        className="w-20 h-20 object-cover rounded-lg"
+                        src={itemImage}
+                        alt={itemName}
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/1a1a1a/666666';
                         }}
                       />
-                      <div className="flex-1">
-                        <h3 className="text-white font-black text-base">{item.name || 'Товар'}</h3>
-                        <p className="text-sm text-gray-500">Размер: {item.size || 'Не указан'}</p>
-                        <p className="text-xs text-gray-500">
-                          {item.stockType === 'in_stock' ? '✅ В наличии (РФ)' : `📦 Предзаказ ~${item.preorderDays || 30} дней`}
-                        </p>
-                        <p className="text-white font-bold text-base mt-1">{item?.price?.toLocaleString() || 0} ₽</p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <button
-                            onClick={() => handleUpdateQuantity(item.id, (item.quantity || 1) - 1)}
-                            disabled={updatingItem === item.id}
-                            className="w-8 h-8 border border-white/20 rounded-lg flex items-center justify-center text-white hover:border-white/50 transition disabled:opacity-50"
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center text-white font-black">{item.quantity || 1}</span>
-                          <button
-                            onClick={() => handleUpdateQuantity(item.id, (item.quantity || 1) + 1)}
-                            disabled={updatingItem === item.id}
-                            className="w-8 h-8 border border-white/20 rounded-lg flex items-center justify-center text-white hover:border-white/50 transition disabled:opacity-50"
-                          >
-                            +
-                          </button>
-                          <button
-                            onClick={() => handleRemove(item.id, item.name)}
-                            className="text-red-400 hover:text-red-300 transition"
-                          >
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
+                    </div>
+
+                    {/* INFO */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="font-bold text-sm md:text-base truncate text-white">
+                          {itemName}
+                        </h3>
+                        <span className="text-white font-bold text-sm md:text-base whitespace-nowrap">
+                          {(itemPrice * itemQuantity).toLocaleString()} ₽
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <p className="text-white font-black">
-                          {((item?.price || 0) * (item?.quantity || 1)).toLocaleString()} ₽
-                        </p>
+
+                      <div className="mt-1 text-xs text-white/30">
+                        Размер: {itemSize}
+                      </div>
+
+                      {/* BADGE */}
+                      <div className="mt-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                          itemStockType === 'in_stock'
+                            ? 'border-emerald-400/20 text-emerald-400 bg-emerald-400/10'
+                            : 'border-amber-400/20 text-amber-400 bg-amber-400/10'
+                        }`}>
+                          {itemStockType === 'in_stock' ? 'В НАЛИЧИИ' : `ПРЕДЗАКАЗ ~${itemPreorderDays}д`}
+                        </span>
+                      </div>
+
+                      {/* CONTROLS - поверх ссылки с pointer-events-auto */}
+                      <div className="flex items-center gap-3 mt-4 pointer-events-auto">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleUpdateQuantity(cartId, itemQuantity - 1);
+                          }}
+                          disabled={updatingItem === cartId}
+                          className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 transition flex items-center justify-center disabled:opacity-50"
+                        >
+                          <span className="text-sm font-bold text-white">−</span>
+                        </button>
+
+                        <span className="w-8 text-center font-bold text-sm text-white">
+                          {itemQuantity}
+                        </span>
+
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleUpdateQuantity(cartId, itemQuantity + 1);
+                          }}
+                          disabled={updatingItem === cartId}
+                          className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 transition flex items-center justify-center disabled:opacity-50"
+                        >
+                          <span className="text-sm font-bold text-white">+</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemove(cartId, itemName);
+                          }}
+                          className="ml-auto text-white/20 hover:text-red-400 transition text-sm"
+                        >
+                          ✕
+                        </button>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-white/10 border-b border-white/10">
-                      <tr className="text-left">
-                        <th className="px-5 py-4 text-white/40 text-[10px] font-bold tracking-wider">ТОВАР</th>
-                        <th className="px-5 py-4 text-white/40 text-[10px] font-bold tracking-wider">НАЗВАНИЕ</th>
-                        <th className="px-5 py-4 text-white/40 text-[10px] font-bold tracking-wider">ЦЕНА</th>
-                        <th className="px-5 py-4 text-white/40 text-[10px] font-bold tracking-wider">КОЛИЧЕСТВО</th>
-                        <th className="px-5 py-4 text-white/40 text-[10px] font-bold tracking-wider">ИТОГО</th>
-                        <th className="px-5 py-4 text-white/40 text-[10px] font-bold tracking-wider"></th>
-                       </tr>
-                    </thead>
-                    <tbody>
-                      {cartItems.map((item: any) => (
-                        <tr key={item.id} className="border-b border-white/5">
-                          <td className="px-5 py-4">
-                            <img
-                              src={item.image || 'https://placehold.co/80x80/1a1a1a/666666'}
-                              alt={item.name || 'Товар'}
-                              className="w-16 h-16 object-cover rounded-lg"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/1a1a1a/666666';
-                              }}
-                            />
-                           </td>
-                          <td className="px-5 py-4">
-                            <p className="text-white font-black text-sm">{item.name || 'Товар'}</p>
-                            <p className="text-xs text-gray-500 mt-1">Размер: {item.size || 'Не указан'}</p>
-                            <p className="text-[10px] text-gray-600 mt-0.5">
-                              {item.stockType === 'in_stock' ? '✅ В наличии (РФ)' : `📦 Предзаказ ~${item.preorderDays || 30} дней`}
-                            </p>
-                           </td>
-                          <td className="px-5 py-4 text-white font-bold">{item?.price?.toLocaleString() || 0} ₽</td>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleUpdateQuantity(item.id, (item.quantity || 1) - 1)}
-                                disabled={updatingItem === item.id}
-                                className="w-8 h-8 border border-white/20 rounded-lg flex items-center justify-center text-white hover:border-white/50 transition disabled:opacity-50"
-                              >
-                                -
-                              </button>
-                              <span className="w-8 text-center text-white font-black">{item.quantity || 1}</span>
-                              <button
-                                onClick={() => handleUpdateQuantity(item.id, (item.quantity || 1) + 1)}
-                                disabled={updatingItem === item.id}
-                                className="w-8 h-8 border border-white/20 rounded-lg flex items-center justify-center text-white hover:border-white/50 transition disabled:opacity-50"
-                              >
-                                +
-                              </button>
-                            </div>
-                           </td>
-                          <td className="px-5 py-4 text-white font-bold">
-                            {((item?.price || 0) * (item?.quantity || 1)).toLocaleString()} ₽
-                           </td>
-                          <td className="px-5 py-4">
-                            <button onClick={() => handleRemove(item.id, item.name)} className="text-red-400 hover:text-red-300 transition">
-                              <i className="fas fa-trash"></i>
-                            </button>
-                           </td>
-                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
 
-          {/* Правая колонка - Итого */}
-          <div className="lg:w-96">
-            <div className="bg-white/5 rounded-2xl p-6 border border-white/10 sticky top-24">
-              <h3 className="text-white font-black text-xl mb-4">ИТОГО</h3>
+          {/* RIGHT - ИТОГО */}
+          <div className="lg:w-[420px] space-y-4">
 
-              <div className="space-y-3 mb-4">
-                <div className="flex justify-between text-gray-400 text-sm">
+            {/* ИТОГО */}
+            <div className={`${glassPanel} p-6 space-y-4`}>
+              <h3 className="text-lg font-black text-white">ИТОГО</h3>
+
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between text-gray-400">
                   <span>Товары ({cartItems.length})</span>
                   <span className="text-white">{totalPrice.toLocaleString()} ₽</span>
                 </div>
-                <div className="flex justify-between text-gray-400 text-sm">
+                <div className="flex justify-between text-gray-400">
                   <span>Доставка</span>
-                  <span className="text-white">{deliveryPrice === 0 ? 'Бесплатно' : `${deliveryPrice.toLocaleString()} ₽`}</span>
+                  <span className="text-white">
+                    {deliveryPrice === 0 ? 'Бесплатно' : `${deliveryPrice.toLocaleString()} ₽`}
+                  </span>
                 </div>
                 {delivery.days && delivery.days !== 'разные сроки' && (
-                  <div className="flex justify-between text-gray-400 text-sm">
+                  <div className="flex justify-between text-gray-500 text-xs">
                     <span>Срок доставки</span>
-                    <span className="text-white text-xs">{delivery.days}</span>
+                    <span className="text-white/60">{delivery.days}</span>
                   </div>
                 )}
-                <div className="border-t border-white/10 pt-3 mt-2">
-                  <div className="flex justify-between text-white font-black text-lg">
-                    <span>Всего:</span>
+                <div className="border-t border-white/10 pt-3 mt-2 space-y-2">
+                  <div className="flex justify-between font-bold text-white text-lg">
+                    <span>Всего</span>
                     <span>{finalPrice.toLocaleString()} ₽</span>
                   </div>
-                  <div className="flex justify-between mt-2 text-gray-400 text-sm">
-                    <span>Предоплата:</span>
+                  <div className="flex justify-between text-gray-400 text-sm">
+                    <span>Предоплата</span>
                     <span className="font-bold text-orange-400">{prepaymentAmount.toLocaleString()} ₽</span>
                   </div>
                   {remainingAmount > 0 && (
-                    <div className="flex justify-between text-xs mt-1">
-                      <span className="text-gray-500">К оплате при получении:</span>
-                      <span className="text-gray-300">{remainingAmount.toLocaleString()} ₽</span>
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>К оплате при получении</span>
+                      <span className="text-white/60">{remainingAmount.toLocaleString()} ₽</span>
                     </div>
                   )}
                 </div>
@@ -350,19 +454,22 @@ const CartPage = () => {
 
               <button
                 onClick={handleCheckout}
-                className="w-full bg-white text-black py-3.5 rounded-xl font-bold text-sm tracking-wider hover:bg-white/90 transition"
+                className={btnPrimary}
               >
                 ОФОРМИТЬ ЗАКАЗ
               </button>
 
-              <p className="text-[10px] text-gray-500 text-center mt-3">{delivery.text}</p>
-              <p className="text-[10px] text-orange-400/70 text-center mt-2">⚠️ При отказе от заказа предоплата не возвращается</p>
+              <p className="text-[10px] text-orange-400/70 text-center">
+                ⚠️ При отказе от заказа предоплата не возвращается
+              </p>
             </div>
+
           </div>
+
         </div>
       </div>
 
-      {/* Модальное окно очистки корзины */}
+      {/* MODAL */}
       {showClearModal && (
         <>
           <div className="fixed inset-0 bg-black/80 z-40" onClick={() => setShowClearModal(false)} />

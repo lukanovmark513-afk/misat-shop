@@ -1,25 +1,17 @@
-import { Request, Response } from 'express';
-import { getDb } from '../database';
+﻿import { Request, Response } from 'express';
+import { getDb } from '../config/database';
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
     const db = await getDb();
     const products = await db.all('SELECT * FROM products ORDER BY id DESC');
 
-    const productsWithArrays = products.map((product: any) => ({
-      ...product,
-      sizes: product.sizes ? JSON.parse(product.sizes) : [],
-      colors: product.colors ? JSON.parse(product.colors) : [],
-      images: product.images ? JSON.parse(product.images) : [],
-      stockType: product.stockType || 'in_stock',
-      preorderDays: product.preorderDays || 30,
-      prepaymentPercent: product.prepaymentPercent || (product.stockType === 'preorder' ? 100 : 70)
-    }));
+    console.log(`📦 Загружено товаров: ${products.length}`);
 
-    res.json(productsWithArrays);
-  } catch (err: any) {
-    console.error('Get products error:', err);
-    res.status(500).json({ error: err.message });
+    res.json(products);
+  } catch (error: any) {
+    console.error('❌ Ошибка загрузки товаров:', error);
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -33,94 +25,107 @@ export const getProductById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Товар не найден' });
     }
 
-    product.sizes = product.sizes ? JSON.parse(product.sizes) : [];
-    product.colors = product.colors ? JSON.parse(product.colors) : [];
-    product.images = product.images ? JSON.parse(product.images) : [];
-    product.stockType = product.stockType || 'in_stock';
-    product.preorderDays = product.preorderDays || 30;
-    product.prepaymentPercent = product.prepaymentPercent || (product.stockType === 'preorder' ? 100 : 70);
-
     res.json(product);
-  } catch (err: any) {
-    console.error('Get product error:', err);
-    res.status(500).json({ error: err.message });
+  } catch (error: any) {
+    console.error('❌ Ошибка загрузки товара:', error);
+    res.status(500).json({ error: error.message });
   }
 };
 
-export const createProduct = async (req: Request, res: Response) => {
+export const addProduct = async (req: Request, res: Response) => {
   try {
     const {
-      name, price, old_price, image, images, description, category,
-      sizes, colors, stock, is_new, is_sale,
-      stockType, preorderDays, prepaymentPercent
+      name,
+      price,
+      old_price,
+      category,
+      description,
+      stock,
+      image,
+      images,
+      sizes,
+      colors,
+      is_new,
+      is_sale,
+      stockType,
+      preorderDays,
+      prepaymentPercent
     } = req.body;
 
     const db = await getDb();
 
-    console.log('📦 Получены данные:', { name, price, stockType, images: images?.substring(0, 100) });
+    const result = await db.run(`
+      INSERT INTO products (
+        name, price, old_price, category, description, stock, image,
+        images, sizes, colors, is_new, is_sale, stockType, preorderDays,
+        prepaymentPercent, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [
+      name,
+      price,
+      old_price || null,
+      category || '',
+      description || '',
+      stock || 0,
+      image || '',
+      images || '[]',
+      sizes || '[]',
+      colors || '[]',
+      is_new || 0,
+      is_sale || 0,
+      stockType || 'in_stock',
+      preorderDays || null,
+      prepaymentPercent || 70
+    ]);
 
-    const result = await db.run(
-      `INSERT INTO products (
-        name, price, old_price, image, images, description, category,
-        sizes, colors, stock, is_new, is_sale,
-        stockType, preorderDays, prepaymentPercent, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-      [
-        name, price, old_price || null, image || '', images || '[]', description || '',
-        category, sizes || '[]', colors || '[]', stock || 0, is_new ? 1 : 0, is_sale ? 1 : 0,
-        stockType || 'in_stock', preorderDays || 30, prepaymentPercent || 100
-      ]
-    );
+    const product = await db.get('SELECT * FROM products WHERE id = ?', [result.lastID]);
 
-    const newProduct = await db.get('SELECT * FROM products WHERE id = ?', [result.lastID]);
-
-    newProduct.sizes = newProduct.sizes ? JSON.parse(newProduct.sizes) : [];
-    newProduct.colors = newProduct.colors ? JSON.parse(newProduct.colors) : [];
-    newProduct.images = newProduct.images ? JSON.parse(newProduct.images) : [];
-
-    res.status(201).json(newProduct);
-  } catch (err: any) {
-    console.error('Create product error:', err);
-    res.status(500).json({ error: err.message });
+    console.log(`✅ Добавлен товар: ${name}`);
+    res.status(201).json(product);
+  } catch (error: any) {
+    console.error('❌ Ошибка добавления товара:', error);
+    res.status(500).json({ error: error.message });
   }
 };
 
 export const updateProduct = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const {
-      name, price, old_price, image, images, description, category,
-      sizes, colors, stock, is_new, is_sale,
-      stockType, preorderDays, prepaymentPercent
-    } = req.body;
-
+    const updates = req.body;
     const db = await getDb();
 
-    console.log('✏️ Обновление товара:', { id, name, price, stockType });
+    // Проверяем существование товара
+    const existing = await db.get('SELECT * FROM products WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
 
-    await db.run(
-      `UPDATE products SET
-        name = ?, price = ?, old_price = ?, image = ?, images = ?, description = ?,
-        category = ?, sizes = ?, colors = ?, stock = ?, is_new = ?, is_sale = ?,
-        stockType = ?, preorderDays = ?, prepaymentPercent = ?, updated_at = datetime('now')
-      WHERE id = ?`,
-      [
-        name, price, old_price || null, image || '', images || '[]', description || '',
-        category, sizes || '[]', colors || '[]', stock || 0, is_new ? 1 : 0, is_sale ? 1 : 0,
-        stockType || 'in_stock', preorderDays || 30, prepaymentPercent || 100, id
-      ]
-    );
+    // Собираем поля для обновления
+    const allowedFields = [
+      'name', 'price', 'old_price', 'category', 'description',
+      'stock', 'image', 'images', 'sizes', 'colors',
+      'is_new', 'is_sale', 'stockType', 'preorderDays', 'prepaymentPercent'
+    ];
 
-    const updatedProduct = await db.get('SELECT * FROM products WHERE id = ?', [id]);
+    const fieldsToUpdate = Object.keys(updates).filter(key => allowedFields.includes(key));
 
-    updatedProduct.sizes = updatedProduct.sizes ? JSON.parse(updatedProduct.sizes) : [];
-    updatedProduct.colors = updatedProduct.colors ? JSON.parse(updatedProduct.colors) : [];
-    updatedProduct.images = updatedProduct.images ? JSON.parse(updatedProduct.images) : [];
+    if (fieldsToUpdate.length === 0) {
+      return res.status(400).json({ error: 'Нет полей для обновления' });
+    }
 
-    res.json(updatedProduct);
-  } catch (err: any) {
-    console.error('Update product error:', err);
-    res.status(500).json({ error: err.message });
+    const setClause = fieldsToUpdate.map(key => `${key} = ?`).join(', ');
+    const values = fieldsToUpdate.map(key => updates[key]);
+    values.push(id);
+
+    await db.run(`UPDATE products SET ${setClause}, updated_at = datetime('now') WHERE id = ?`, values);
+
+    const product = await db.get('SELECT * FROM products WHERE id = ?', [id]);
+
+    console.log(`✅ Обновлен товар: ${product.name}`);
+    res.json(product);
+  } catch (error: any) {
+    console.error('❌ Ошибка обновления товара:', error);
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -128,10 +133,59 @@ export const deleteProduct = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const db = await getDb();
+
+    // Проверяем существование
+    const existing = await db.get('SELECT * FROM products WHERE id = ?', [id]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+
     await db.run('DELETE FROM products WHERE id = ?', [id]);
-    res.json({ message: 'Товар удалён' });
-  } catch (err: any) {
-    console.error('Delete product error:', err);
-    res.status(500).json({ error: err.message });
+
+    console.log(`🗑️ Удален товар: ${existing.name}`);
+    res.json({ message: 'Товар удален' });
+  } catch (error: any) {
+    console.error('❌ Ошибка удаления товара:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Дополнительные функции
+
+export const getProductsByCategory = async (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    const db = await getDb();
+    const products = await db.all(
+      'SELECT * FROM products WHERE category = ? AND is_active = 1 ORDER BY id DESC',
+      [category]
+    );
+    res.json(products);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getNewProducts = async (req: Request, res: Response) => {
+  try {
+    const db = await getDb();
+    const products = await db.all(
+      'SELECT * FROM products WHERE is_new = 1 AND is_active = 1 ORDER BY id DESC LIMIT 10'
+    );
+    res.json(products);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const getSaleProducts = async (req: Request, res: Response) => {
+  try {
+    const db = await getDb();
+    const products = await db.all(
+      'SELECT * FROM products WHERE is_sale = 1 AND is_active = 1 ORDER BY id DESC LIMIT 10'
+    );
+    res.json(products);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 };

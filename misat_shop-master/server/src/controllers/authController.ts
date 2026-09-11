@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getDb } from '../database';
+import { getDb } from '../database';cd C:\Users\79507\Downloads\misat_shop-master\misat_shop-master\client\src\services
+
+# Проверяем, какой api.ts сейчас
+Get-Content api.ts | Select-Object -First 20
 
 const JWT_SECRET = process.env.JWT_SECRET || 'misat-super-secret-key-2025';
 

@@ -13,7 +13,6 @@ const OrdersPage = () => {
       const user = getCurrentUser();
       if (user) {
         const userOrders = getUserOrders(user.id);
-        // Сортируем заказы по дате (сначала новые)
         const sortedOrders = [...userOrders].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -48,47 +47,140 @@ const OrdersPage = () => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
   };
 
+  // ============================================
+  // НЕ АВТОРИЗОВАН
+  // ============================================
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] pt-20">
-        <div className="w-full px-4 md:px-8 lg:px-16 py-12">
-          <div className="max-w-md mx-auto text-center">
-            <div className="w-20 h-20 mx-auto bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-              <i className="fas fa-lock text-white/40 text-3xl"></i>
-            </div>
-            <h2 className="text-2xl font-black text-white mb-3">ТРЕБУЕТСЯ АВТОРИЗАЦИЯ</h2>
-            <p className="text-gray-400 text-sm mb-8">Войдите в аккаунт, чтобы просмотреть заказы</p>
-            <Link to="/profile" className="inline-block bg-white text-black px-8 py-3 font-bold text-sm tracking-wider hover:bg-white/90 transition rounded-xl">
-              ВОЙТИ
+      <div className="min-h-screen bg-[#050505] text-white pt-12 md:pt-20 pb-28 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[#050505]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%)]" />
+          <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 md:px-8 lg:px-16 py-4 md:py-8">
+          <div className="text-xs text-gray-500 mt-6 md:mt-0 mb-4 md:mb-6">
+            <Link to="/" className="hover:text-white transition text-gray-400 md:text-gray-500 inline-block">
+              Главная
             </Link>
+            <span className="inline-block mx-1"> </span>
+            <i className="fas fa-chevron-right text-[9px] text-gray-600 inline-block"></i>
+            <span className="inline-block mx-1"> </span>
+            <span className="text-white/80 md:text-white inline-block">Мои заказы</span>
+          </div>
+
+          <div className="max-w-md mx-auto text-center mt-2 md:mt-12">
+            <div className="relative">
+              <div className="w-28 h-28 md:w-32 md:h-32 mx-auto bg-white/5 rounded-full flex items-center justify-center mb-6 md:mb-8 relative">
+                <div className="absolute inset-0 bg-white/5 rounded-full animate-pulse"></div>
+                <div className="absolute inset-2 border border-white/10 rounded-full"></div>
+                <i className="fas fa-lock text-white/20 text-4xl md:text-5xl relative z-10"></i>
+              </div>
+            </div>
+
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white mb-3 md:mb-4">
+              ТРЕБУЕТСЯ АВТОРИЗАЦИЯ
+            </h1>
+
+            <p className="text-gray-400 text-xs md:text-sm mb-6 md:mb-8 max-w-sm mx-auto">
+              Войдите в аккаунт, чтобы просмотреть свои заказы
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/profile"
+                className="inline-flex items-center justify-center gap-2 bg-white text-black px-6 md:px-8 py-3 md:py-3.5 font-bold text-xs md:text-sm tracking-wider hover:bg-white/90 transition rounded-xl"
+              >
+                <i className="fas fa-arrow-right text-xs md:text-sm"></i>
+                ВОЙТИ
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // ============================================
+  // ПУСТЫЕ ЗАКАЗЫ
+  // ============================================
   if (orders.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] pt-20">
-        <div className="w-full px-4 md:px-8 lg:px-16 py-12">
-          <div className="max-w-md mx-auto text-center">
-            <div className="w-20 h-20 mx-auto bg-white/5 rounded-2xl flex items-center justify-center mb-6">
-              <i className="fas fa-box-open text-white/40 text-3xl"></i>
-            </div>
-            <h2 className="text-2xl font-black text-white mb-3">У ВАС ПОКА НЕТ ЗАКАЗОВ</h2>
-            <p className="text-gray-400 text-sm mb-8">Перейдите в каталог, чтобы сделать первый заказ</p>
-            <Link to="/catalog" className="inline-block bg-white text-black px-8 py-3 font-bold text-sm tracking-wider hover:bg-white/90 transition rounded-xl">
-              ПЕРЕЙТИ В КАТАЛОГ
+      <div className="min-h-screen bg-[#050505] text-white pt-12 md:pt-20 pb-28 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[#050505]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%)]" />
+          <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:50px_50px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 md:px-8 lg:px-16 py-4 md:py-8">
+          <div className="text-xs text-gray-500 mt-6 md:mt-0 mb-4 md:mb-6">
+            <Link to="/" className="hover:text-white transition text-gray-400 md:text-gray-500 inline-block">
+              Главная
             </Link>
+            <span className="inline-block mx-1"> </span>
+            <i className="fas fa-chevron-right text-[9px] text-gray-600 inline-block"></i>
+            <span className="inline-block mx-1"> </span>
+            <span className="text-white/80 md:text-white inline-block">Мои заказы</span>
+          </div>
+
+          <div className="max-w-md mx-auto text-center mt-2 md:mt-12">
+            <div className="relative">
+              <div className="w-28 h-28 md:w-32 md:h-32 mx-auto bg-white/5 rounded-full flex items-center justify-center mb-6 md:mb-8 relative">
+                <div className="absolute inset-0 bg-white/5 rounded-full animate-pulse"></div>
+                <div className="absolute inset-2 border border-white/10 rounded-full"></div>
+                <i className="fas fa-box-open text-white/20 text-4xl md:text-5xl relative z-10"></i>
+              </div>
+            </div>
+
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter text-white mb-3 md:mb-4">
+              У ВАС ПОКА НЕТ ЗАКАЗОВ
+            </h1>
+
+            <p className="text-gray-400 text-xs md:text-sm mb-6 md:mb-8 max-w-sm mx-auto">
+              Перейдите в каталог, чтобы сделать первый заказ
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/catalog"
+                className="inline-flex items-center justify-center gap-2 bg-white text-black px-6 md:px-8 py-3 md:py-3.5 font-bold text-xs md:text-sm tracking-wider hover:bg-white/90 transition rounded-xl"
+              >
+                <i className="fas fa-arrow-right text-xs md:text-sm"></i>
+                ПЕРЕЙТИ В КАТАЛОГ
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // ============================================
+  // ЗАКАЗЫ ЕСТЬ
+  // ============================================
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pt-20">
-      <div className="w-full px-4 md:px-8 lg:px-16 py-8">
+    <div className="min-h-screen bg-[#050505] text-white pt-12 md:pt-20 pb-28 relative overflow-hidden">
+      {/* Background FX */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[#050505]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_55%)]" />
+        <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.15)_1px,transparent_1px)] bg-[size:50px_50px]" />
+      </div>
+
+      <div className="relative z-10 w-full px-4 md:px-8 lg:px-16 py-4 md:py-8">
+
+        {/* Хлебные крошки */}
+        <div className="text-xs text-gray-500 mt-6 md:mt-0 mb-4 md:mb-6">
+          <Link to="/" className="hover:text-white transition text-gray-400 md:text-gray-500 inline-block">
+            Главная
+          </Link>
+          <span className="inline-block mx-1"> </span>
+          <i className="fas fa-chevron-right text-[9px] text-gray-600 inline-block"></i>
+          <span className="inline-block mx-1"> </span>
+          <span className="text-white/80 md:text-white inline-block">Мои заказы</span>
+        </div>
 
         {/* Баннер */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900/80 via-gray-800/80 to-black border border-white/10 mb-8">
@@ -102,7 +194,7 @@ const OrdersPage = () => {
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
 
-          <div className="relative py-8 px-8">
+          <div className="relative py-8 md:py-10 px-6 md:px-8">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-8 h-0.5 bg-white/40"></div>
               <span className="text-gray-400 text-[10px] tracking-[0.3em]">ЛИЧНЫЙ КАБИНЕТ</span>
@@ -121,11 +213,11 @@ const OrdersPage = () => {
           {orders.map(order => (
             <div
               key={order.id}
-              className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden hover:border-white/30 transition-all duration-300"
+              className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden hover:border-white/30 transition-all duration-300"
             >
               {/* Заголовок заказа */}
               <div
-                className="p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-white/5 transition"
+                className="p-4 md:p-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-white/5 transition"
                 onClick={() => toggleExpand(order.id)}
               >
                 <div className="flex items-center gap-4">
@@ -162,7 +254,7 @@ const OrdersPage = () => {
 
               {/* Детали заказа (раскрывается) */}
               {expandedOrder === order.id && (
-                <div className="border-t border-white/10 p-5 bg-white/5">
+                <div className="border-t border-white/10 p-4 md:p-5 bg-white/5">
                   <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
                     <i className="fas fa-box text-white/40 text-xs"></i>
                     ТОВАРЫ В ЗАКАЗЕ

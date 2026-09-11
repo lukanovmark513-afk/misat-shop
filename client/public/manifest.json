@@ -1,0 +1,16 @@
+{
+  "name": "MISAT - Интернет-магазин одежды",
+  "short_name": "MISAT",
+  "description": "Минимализм. Качество. Стиль.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    }
+  ]
+}

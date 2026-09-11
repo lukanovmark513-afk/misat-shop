@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { getAllOrders, updateOrderStatus, Order } from '../../services/storageService';
 import toast from 'react-hot-toast';
 
@@ -85,7 +85,6 @@ const AdminOrders = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white">УПРАВЛЕНИЕ ЗАКАЗАМИ</h1>
         <div className="flex items-center gap-2 mt-2">
@@ -94,7 +93,6 @@ const AdminOrders = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <div className="bg-white/5 rounded-xl p-3 border border-white/10">
           <p className="text-white text-xl font-bold">{stats.total}</p>
@@ -122,7 +120,6 @@ const AdminOrders = () => {
         </div>
       </div>
 
-      {/* Filter */}
       <div className="flex gap-2 mb-6 flex-wrap">
         <button
           onClick={() => setFilterStatus('all')}
@@ -146,7 +143,6 @@ const AdminOrders = () => {
       </div>
 
       {isMobile ? (
-        // Мобильная версия - карточки
         <div className="space-y-4">
           {filteredOrders.map(order => {
             const user = JSON.parse(localStorage.getItem('misat_users') || '[]').find((u: any) => u.id === order.userId);
@@ -183,7 +179,6 @@ const AdminOrders = () => {
           })}
         </div>
       ) : (
-        // Десктопная версия - таблица
         <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -208,7 +203,7 @@ const AdminOrders = () => {
                           <p className="text-white font-medium">{user?.first_name} {user?.last_name}</p>
                           <p className="text-gray-500 text-xs">{user?.email}</p>
                         </div>
-                       </td>
+                      </td>
                       <td className="px-4 py-3 text-white font-bold">{order.total.toLocaleString()} ₽</td>
                       <td className="px-4 py-3">
                         <select
@@ -220,14 +215,14 @@ const AdminOrders = () => {
                             <option key={s.value} value={s.value} className="bg-[#0a0a0a]">{s.label}</option>
                           ))}
                         </select>
-                        </td>
+                      </td>
                       <td className="px-4 py-3 text-gray-400 text-sm">{new Date(order.created_at).toLocaleDateString()}</td>
                       <td className="px-4 py-3">
                         <button onClick={() => setSelectedOrder(order)} className="text-gray-400 hover:text-white transition">
                           <i className="fas fa-eye"></i>
                         </button>
-                        </td>
-                      </tr>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -236,7 +231,6 @@ const AdminOrders = () => {
         </div>
       )}
 
-      {/* Модальное окно с деталями заказа - ТЕМНОЕ */}
       {selectedOrder && (
         <>
           <div className="fixed inset-0 bg-black/80 z-50" onClick={() => setSelectedOrder(null)} />
@@ -247,40 +241,29 @@ const AdminOrders = () => {
             </div>
 
             <div className="border-t border-white/10 pt-4 space-y-5">
-              {/* Информация о получателе */}
               <div>
                 <h3 className="text-white/40 text-[10px] font-bold tracking-wider mb-2">ИНФОРМАЦИЯ О ПОЛУЧАТЕЛЕ</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(() => {
-                    const fioMatch = selectedOrder.comment.match(/ФИО: (.*?)(\\n|$)/);
-                    const emailMatch = selectedOrder.comment.match(/Email: (.*?)(\\n|$)/);
-                    return (
-                      <>
-                        <div>
-                          <p className="text-gray-500 text-xs">ФИО</p>
-                          <p className="text-white text-sm font-medium">{fioMatch ? fioMatch[1] : 'Не указано'}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Телефон</p>
-                          <p className="text-white text-sm font-medium">{selectedOrder.phone}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Email</p>
-                          <p className="text-white text-sm font-medium">{emailMatch ? emailMatch[1] : 'Не указан'}</p>
-                        </div>
-                      </>
-                    );
-                  })()}
+                  <div>
+                    <p className="text-gray-500 text-xs">ФИО</p>
+                    <p className="text-white text-sm font-medium">{selectedOrder.name || 'Не указано'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-xs">Телефон</p>
+                    <p className="text-white text-sm font-medium">{selectedOrder.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-xs">Email</p>
+                    <p className="text-white text-sm font-medium">{selectedOrder.email || 'Не указан'}</p>
+                  </div>
                 </div>
               </div>
 
-              {/* Адрес доставки */}
               <div>
                 <h3 className="text-white/40 text-[10px] font-bold tracking-wider mb-2">АДРЕС ДОСТАВКИ</h3>
                 <p className="text-gray-300 text-sm whitespace-pre-line">{selectedOrder.address}</p>
               </div>
 
-              {/* Товары */}
               <div>
                 <h3 className="text-white/40 text-[10px] font-bold tracking-wider mb-2">СОСТАВ ЗАКАЗА</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -301,21 +284,6 @@ const AdminOrders = () => {
                 </div>
               </div>
 
-              {/* Комментарий */}
-              {(() => {
-                const comment = selectedOrder.comment.replace(/ФИО: .*?\\n/, '').replace(/Email: .*?\\n/, '').trim();
-                if (comment && comment !== '') {
-                  return (
-                    <div>
-                      <h3 className="text-white/40 text-[10px] font-bold tracking-wider mb-2">КОММЕНТАРИЙ</h3>
-                      <p className="text-gray-400 text-sm">{comment}</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              {/* Статус */}
               <div className="pt-2">
                 <label className="text-white/40 text-[10px] font-bold block mb-2 tracking-wider">СТАТУС</label>
                 <select

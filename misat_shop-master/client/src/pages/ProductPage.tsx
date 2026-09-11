@@ -1,109 +1,294 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { addToCartAsync } from '../store/slices/cartSlice';
 import { toggleFavoriteAsync } from '../store/slices/favoritesSlice';
 import { productsAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
-interface Review {
+// ============================================
+// ТИПЫ
+// ============================================
+interface Product {
   id: number;
-  productId: number;
-  userId: number;
-  userName: string;
+  name: string;
+  price: number;
+  old_price?: number;
+  image?: string;
+  images: string[];
+  sizes: string[];
+  colors: string[];
+  category: string;
   rating: number;
-  comment: string;
-  photos?: string[];
-  date: string;
+  reviews: number;
+  is_new?: boolean;
+  is_sale?: boolean;
+  stockType?: string;
+  preorderDays?: number;
+  prepaymentPercent?: number;
+  origin?: string;
+  condition?: string;
+  lot?: string;
+  label?: string;
+  description?: string;
 }
 
+// ============================================
+// ЦВЕТОВАЯ ПАЛИТРА
+// ============================================
+const COLORS = {
+  bg: '#0a0a0b',
+  bgCard: '#111113',
+  bgElevated: '#161619',
+  ink: '#e8e4dd',
+  inkSoft: 'rgba(232, 228, 221, 0.62)',
+  inkFaint: 'rgba(232, 228, 221, 0.38)',
+  stamp: '#b8937a',
+  stampDark: '#8b6f5a',
+  olive: '#7a8a7a',
+  rule: 'rgba(232, 228, 221, 0.08)',
+  ruleStrong: 'rgba(232, 228, 221, 0.15)',
+  gold: '#b8a088',
+  goldLight: '#d4c4b0',
+};
+
+// ============================================
+// УТИЛИТЫ
+// ============================================
+const safeParseArray = (value: any): any[] => {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+// ============================================
+// SVG ШТАМП
+// ============================================
+const ArchiveStamp = ({ lot = '0142', size = 56 }: { lot?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 56 56" style={{ opacity: 0.85 }}>
+    <circle cx="28" cy="28" r="24" fill="none" stroke={COLORS.stamp} strokeWidth="1" strokeDasharray="2 3" />
+    <text x="28" y="25" textAnchor="middle" fontFamily="Anton, sans-serif" fontSize="9" fill={COLORS.stamp}>M/A</text>
+    <text x="28" y="34" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="5" fill={COLORS.stamp}>№{lot}</text>
+  </svg>
+);
+
+// ============================================
+// АНИМАЦИИ
+// ============================================
+const ANIMATIONS = {
+  fadeInUp: {
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] } }
+  },
+  scaleIn: {
+    hidden: { opacity: 0, scale: 0.98 },
+    visible: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] } }
+  },
+  staggerContainer: {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } }
+  }
+};
+
+// ============================================
+// КОМПОНЕНТ: ЗВЁЗДНЫЙ РЕЙТИНГ
+// ============================================
+const StarRating = ({ rating, size = 'text-xs' }: { rating: number; size?: string }) => (
+  <div className="flex items-center gap-0.5">
+    {[...Array(5)].map((_, i) => (
+      <i
+        key={i}
+        className={`fa-solid fa-star ${size} ${
+          i < Math.floor(rating) ? 'text-amber-400' : i < rating ? 'text-amber-400/50' : 'text-white/20'
+        }`}
+      />
+    ))}
+  </div>
+);
+
+// ============================================
+// КОМПОНЕНТ: КАРТОЧКА ТОВАРА
+// ============================================
+interface ProductCardProps {
+  product: Product;
+  isFavorite: boolean;
+  onToggleFavorite: (id: number, e: React.MouseEvent) => void;
+  onAddToCart: (product: Product) => void;
+  isAdding?: boolean;
+}
+
+const ProductCard = React.memo(({ product, isFavorite, onToggleFavorite, onAddToCart, isAdding = false }: ProductCardProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <motion.div
+      variants={ANIMATIONS.fadeInUp}
+      className="group relative rounded-lg overflow-hidden cursor-pointer"
+      style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, transition: 'border-color 0.25s, transform 0.25s' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => window.location.href = `/product/${product.id}`}
+      whileHover={{ y: -3 }}
+    >
+      <div className="relative aspect-[4/5] overflow-hidden" style={{ backgroundColor: COLORS.bg }}>
+        <img
+          src={product.images?.[0] || product.image || 'https://placehold.co/800x1000/111113/e8e4dd?text=NO+IMAGE'}
+          alt={product.name}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ filter: 'grayscale(0.2) sepia(0.1) brightness(0.95)' }}
+          loading="lazy"
+        />
+        <div className="absolute bottom-3 right-3">
+          <ArchiveStamp lot={product.lot || String(product.id).padStart(4, '0')} size={48} />
+        </div>
+        <span className="absolute top-3 left-3 text-[9px] tracking-wider px-2 py-1" style={{ backgroundColor: 'rgba(10, 10, 11, 0.85)', border: `1px solid ${COLORS.rule}`, color: COLORS.olive, fontFamily: 'JetBrains Mono, monospace' }}>
+          {product.condition || (product.stockType === 'instock' ? 'EXCELLENT' : 'VINTAGE')}
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(product.id, e); }}
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-all duration-300"
+          style={{ backgroundColor: isFavorite ? `${COLORS.stamp}30` : 'rgba(10, 10, 11, 0.7)', border: `1px solid ${isFavorite ? COLORS.stamp : COLORS.rule}`, color: isFavorite ? COLORS.stamp : COLORS.inkSoft, borderRadius: '50%' }}
+        >
+          <i className={`${isFavorite ? 'fas' : 'far'} fa-heart text-xs`} />
+        </button>
+      </div>
+      <div className="p-4" style={{ backgroundColor: COLORS.bgCard }}>
+        <div className="flex justify-between items-center mb-3 pb-2" style={{ borderBottom: `1px dashed ${COLORS.rule}` }}>
+          <span className="text-[9px] tracking-wider" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+            ЛОТ {product.lot || String(product.id).padStart(4, '0')}
+          </span>
+          <span className="text-[9px] tracking-wider" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+            {product.origin || 'АРХИВ'}
+          </span>
+        </div>
+        <h3 className="text-sm leading-snug mb-3 line-clamp-2" style={{ color: COLORS.ink }}>{product.name}</h3>
+        <div className="flex items-center justify-between">
+          <span className="text-base font-semibold" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>
+            {product.price.toLocaleString()} ₽
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
+            disabled={isAdding}
+            className="w-9 h-9 flex items-center justify-center transition-all duration-200"
+            style={{ backgroundColor: 'transparent', border: `1px solid ${COLORS.ink}`, color: COLORS.ink, borderRadius: '2px' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = COLORS.ink; e.currentTarget.style.color = COLORS.bg; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = COLORS.ink; }}
+          >
+            {isAdding ? <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <i className="fas fa-plus text-sm" />}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+ProductCard.displayName = 'ProductCard';
+
+// ============================================
+// ГЛАВНЫЙ КОМПОНЕНТ: СТРАНИЦА ТОВАРА
+// ============================================
 const ProductPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const favorites = useAppSelector((state) => state.favorites.items);
-  const [product, setProduct] = useState<any>(null);
-  const [similarProducts, setSimilarProducts] = useState<any[]>([]);
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [newReview, setNewReview] = useState({ rating: 0, comment: '' });
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
-  const [reviewImages, setReviewImages] = useState<string[]>([]);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState('description');
+  const [addingToCart, setAddingToCart] = useState(false);
 
-  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
-  const [selectedViewerImage, setSelectedViewerImage] = useState(0);
+  const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
+  const isFavorite = favoriteSet.has(Number(id));
 
-  // Определение мобильного устройства
+  const nextImage = useCallback(() => {
+    if (!product?.images?.length) return;
+    setSelectedImageIndex((prev) => (prev === product.images.length - 1 ? 0 : prev + 1));
+  }, [product?.images]);
+
+  const prevImage = useCallback(() => {
+    if (!product?.images?.length) return;
+    setSelectedImageIndex((prev) => (prev === 0 ? product.images.length - 1 : prev - 1));
+  }, [product?.images]);
+
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) { setIsFullscreen(false); e.preventDefault(); }
+      if (e.key === 'ArrowRight' && isFullscreen) { nextImage(); e.preventDefault(); }
+      if (e.key === 'ArrowLeft' && isFullscreen) { prevImage(); e.preventDefault(); }
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const parseArrayField = (field: any): string[] => {
-    if (!field) return [];
-    if (Array.isArray(field)) return field;
-    if (typeof field === 'string') {
-      try {
-        return JSON.parse(field);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, nextImage, prevImage]);
 
   useEffect(() => {
     const loadProduct = async () => {
       try {
         setIsLoading(true);
         const response = await productsAPI.getById(Number(id));
-        const productData = response.data;
-
-        productData.sizes = parseArrayField(productData.sizes);
-        productData.colors = parseArrayField(productData.colors);
-        productData.images = parseArrayField(productData.images);
-
+        const productData = { ...response.data };
+        productData.sizes = safeParseArray(productData.sizes);
+        productData.colors = safeParseArray(productData.colors);
+        productData.images = safeParseArray(productData.images);
         if ((!productData.images || productData.images.length === 0) && productData.image) {
           productData.images = [productData.image];
         }
+        productData.origin = productData.origin || ['ОСАКА, JP', 'МИЛАН, IT', 'НЬЮ-ЙОРК, US'][Number(id) % 3];
+        productData.condition = productData.condition || ['EXCELLENT', 'MINT', 'VINTAGE'][Number(id) % 3];
+        productData.lot = productData.lot || String(id).padStart(4, '0');
+        productData.label = productData.label || 'ARCHIVE LABEL';
+        productData.description = productData.description || 'Уникальная архивная вещь с историей. Отобрана вручную и проверена на подлинность.';
 
         setProduct(productData);
         setSelectedImageIndex(0);
 
         const allReviews = JSON.parse(localStorage.getItem('misat_reviews') || '[]');
-        const productReviews = allReviews.filter((r: Review) => r.productId === Number(id));
+        const productReviews = allReviews.filter((r: any) => r.productId === Number(id));
         setReviews(productReviews);
-
         if (isAuthenticated && user) {
-          setHasReviewed(productReviews.some((r: Review) => r.userId === user.id));
+          setHasReviewed(productReviews.some((r: any) => r.userId === user.id));
         }
 
         const allProducts = await productsAPI.getAll();
-        const similar = allProducts.data
+        let productsData = [];
+        if (Array.isArray(allProducts.data)) productsData = allProducts.data;
+        else if (allProducts.data?.data) productsData = allProducts.data.data;
+        else if (allProducts.data?.products) productsData = allProducts.data.products;
+
+        const similar = productsData
           .filter((p: any) => p.category === productData.category && p.id !== productData.id)
-          .map((p: any) => ({
+          .map((p: any, idx: number) => ({
             ...p,
-            sizes: parseArrayField(p.sizes),
-            colors: parseArrayField(p.colors),
-            images: parseArrayField(p.images),
+            sizes: safeParseArray(p.sizes),
+            colors: safeParseArray(p.colors),
+            images: safeParseArray(p.images),
+            origin: ['ОСАКА, JP', 'МИЛАН, IT', 'ЛОНДОН, UK'][idx % 3],
+            condition: ['EXCELLENT', 'MINT', 'VINTAGE'][idx % 3],
+            lot: String(p.id).padStart(4, '0'),
           }))
           .slice(0, 4);
         setSimilarProducts(similar);
-
       } catch (error) {
-        console.error('Ошибка загрузки товара:', error);
+        console.error('Ошибка загрузки:', error);
         toast.error('Товар не найден');
         navigate('/catalog');
       } finally {
@@ -113,80 +298,57 @@ const ProductPage = () => {
     loadProduct();
   }, [id, isAuthenticated, user, navigate]);
 
-  const openImageViewer = (index: number) => {
-    setSelectedViewerImage(index);
-    setIsImageViewerOpen(true);
-    document.body.style.overflow = 'hidden';
-  };
-
-  const closeImageViewer = () => {
-    setIsImageViewerOpen(false);
-    document.body.style.overflow = 'auto';
-  };
-
-  const isFavorite = favorites.includes(Number(id));
-
   const handleToggleFavorite = () => {
-    if (!isAuthenticated) {
-      toast.error('Войдите в аккаунт');
-      return;
-    }
+    if (!isAuthenticated) { toast.error('Войдите в аккаунт'); return; }
     dispatch(toggleFavoriteAsync(Number(id)));
   };
 
-  const handleAddToCart = () => {
-    if (!selectedSize) {
-      toast.error('Выберите размер');
-      return;
-    }
-    if (product) {
-      dispatch(addToCartAsync({
+  const handleAddToCart = async () => {
+    if (!selectedSize) { toast.error('Выберите размер'); return; }
+    if (!product) return;
+    setAddingToCart(true);
+    try {
+      await dispatch(addToCartAsync({
         productId: product.id,
-        quantity,
+        quantity: 1,
         size: selectedSize,
         product: {
           id: product.id,
           name: product.name,
           price: product.price,
-          image: product.images?.[selectedImageIndex] || product.images?.[0] || product.image,
-          sizes: product.sizes,
-          stockType: product.stockType,
-          preorderDays: product.preorderDays
+          image: product.images?.[0] || product.image || '',
+          sizes: product.sizes || ['S', 'M', 'L']
         }
       }));
-      toast.success(`${product.name} добавлен в корзину`);
+      toast.success(`Лот ${product.lot} добавлен в корзину`, {
+        style: { background: COLORS.bgCard, color: COLORS.ink, border: `1px solid ${COLORS.ruleStrong}`, borderRadius: '4px', fontSize: '12px', fontFamily: 'JetBrains Mono, monospace' }
+      });
+    } catch (error) {
+      toast.error('Ошибка при добавлении');
+    } finally {
+      setAddingToCart(false);
     }
   };
 
-  const handleBuyNow = () => {
-    if (!selectedSize) {
-      toast.error('Выберите размер');
-      return;
-    }
-    if (!isAuthenticated) {
-      toast.error('Войдите в аккаунт');
-      navigate('/profile');
-      return;
-    }
-    dispatch(addToCartAsync({
+  const handleBuyNow = async () => {
+    if (!selectedSize) { toast.error('Выберите размер'); return; }
+    if (!isAuthenticated) { toast.error('Войдите в аккаунт'); navigate('/profile'); return; }
+    if (!product) return;
+    await dispatch(addToCartAsync({
       productId: product.id,
-      quantity,
+      quantity: 1,
       size: selectedSize,
       product: {
         id: product.id,
         name: product.name,
         price: product.price,
-        image: product.images?.[selectedImageIndex] || product.images?.[0] || product.image,
-        sizes: product.sizes,
-        stockType: product.stockType,
-        preorderDays: product.preorderDays
+        image: product.images?.[0] || product.image || '',
+        sizes: product.sizes || ['S', 'M', 'L']
       }
     }));
-    toast.success('Переход к оформлению...');
-    setTimeout(() => navigate('/checkout'), 500);
+    navigate('/checkout');
   };
 
-  // Высококачественная компрессия изображений для 4K
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -196,36 +358,18 @@ const ProductPage = () => {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-
-          // Сохраняем исходные размеры для 4K качества
           let width = img.width;
           let height = img.height;
-
-          // Опционально: ограничиваем максимальный размер для производительности
-          const maxSize = 4096; // 4K
-          if (width > height && width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          } else if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-
+          const maxSize = 4096;
+          if (width > height && width > maxSize) { height = (height * maxSize) / width; width = maxSize; }
+          else if (height > maxSize) { width = (width * maxSize) / height; height = maxSize; }
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-
-          // Высокое качество JPEG
           let quality = 0.92;
           let result = canvas.toDataURL('image/jpeg', quality);
-
-          // Если файл больше 5MB, немного уменьшаем качество
-          while (result.length > 5 * 1024 * 1024 && quality > 0.7) {
-            quality -= 0.05;
-            result = canvas.toDataURL('image/jpeg', quality);
-          }
-
+          while (result.length > 5 * 1024 * 1024 && quality > 0.7) { quality -= 0.05; result = canvas.toDataURL('image/jpeg', quality); }
           resolve(result);
         };
         img.onerror = reject;
@@ -237,43 +381,22 @@ const ProductPage = () => {
   const handleReviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingImage(true);
     try {
       const compressed = await compressImage(file);
       setReviewImages([...reviewImages, compressed]);
-    } catch (error) {
+    } catch {
       toast.error('Ошибка загрузки фото');
-    } finally {
-      setIsUploadingImage(false);
     }
-  };
-
-  const removeReviewImage = (index: number) => {
-    setReviewImages(reviewImages.filter((_, i) => i !== index));
   };
 
   const handleSubmitReview = () => {
-    if (!isAuthenticated) {
-      toast.error('Войдите в аккаунт');
-      return;
-    }
-    if (hasReviewed) {
-      toast.error('Вы уже оставляли отзыв');
-      return;
-    }
-    if (newReview.rating === 0) {
-      toast.error('Поставьте оценку');
-      return;
-    }
-    if (!newReview.comment.trim()) {
-      toast.error('Напишите отзыв');
-      return;
-    }
+    if (!isAuthenticated) { toast.error('Войдите в аккаунт'); return; }
+    if (hasReviewed) { toast.error('Вы уже оставляли отзыв'); return; }
+    if (newReview.rating === 0) { toast.error('Поставьте оценку'); return; }
+    if (!newReview.comment.trim()) { toast.error('Напишите отзыв'); return; }
 
     setIsSubmitting(true);
-
-    const newReviewObj: Review = {
+    const newReviewObj = {
       id: Date.now(),
       productId: Number(id),
       userId: user.id,
@@ -283,11 +406,9 @@ const ProductPage = () => {
       photos: reviewImages,
       date: new Date().toISOString(),
     };
-
     const allReviews = JSON.parse(localStorage.getItem('misat_reviews') || '[]');
     allReviews.push(newReviewObj);
     localStorage.setItem('misat_reviews', JSON.stringify(allReviews));
-
     setReviews([newReviewObj, ...reviews]);
     setHasReviewed(true);
     setNewReview({ rating: 0, comment: '' });
@@ -298,13 +419,15 @@ const ProductPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black pt-20 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center pt-16 md:pt-20" style={{ backgroundColor: COLORS.bg }}>
         <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto">
-            <div className="absolute inset-0 border-2 border-white/20 rounded-full"></div>
-            <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <div className="relative w-12 h-12 mx-auto">
+            <div className="absolute inset-0 rounded-full" style={{ border: `1px solid ${COLORS.rule}` }} />
+            <div className="absolute inset-0 rounded-full" style={{ border: `1px solid ${COLORS.stamp}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
           </div>
-          <p className="text-gray-500 text-xs tracking-wider mt-4 animate-pulse">ЗАГРУЗКА</p>
+          <p className="text-[10px] tracking-[0.3em] mt-4" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+            ЗАГРУЗКА ЛОТА
+          </p>
         </div>
       </div>
     );
@@ -312,11 +435,11 @@ const ProductPage = () => {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-black pt-20 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center pt-16 md:pt-20" style={{ backgroundColor: COLORS.bg }}>
         <div className="text-center">
-          <i className="fas fa-box-open text-5xl text-gray-600 mb-4"></i>
-          <h2 className="text-2xl font-black text-white mb-4">ТОВАР НЕ НАЙДЕН</h2>
-          <Link to="/catalog" className="bg-white text-black px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-100 transition">В КАТАЛОГ</Link>
+          <div className="text-6xl mb-4 opacity-30">📦</div>
+          <h2 className="text-2xl font-light mb-2" style={{ color: COLORS.ink }}>Товар не найден</h2>
+          <Link to="/catalog" className="text-sm transition" style={{ color: COLORS.inkFaint }}>Вернуться в каталог</Link>
         </div>
       </div>
     );
@@ -325,278 +448,681 @@ const ProductPage = () => {
   const averageRating = reviews.length > 0
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
     : '0.0';
-
-  const currentImage = product.images && product.images.length > 0
-    ? product.images[selectedImageIndex]
-    : (product.image || 'https://placehold.co/800x800/1a1a1a/666666?text=No+Image');
+  const currentImage = product.images?.[selectedImageIndex] || product.image || 'https://placehold.co/800x800/111113/e8e4dd';
+  const isSizeSelected = selectedSize !== '';
 
   return (
-    <div className="min-h-screen bg-black pt-16 pb-24 md:pb-0">
-      <div className="w-full px-4 md:px-8 lg:px-16 py-4 md:py-6">
+    <div className="min-h-screen pt-16 md:pt-20" style={{ backgroundColor: COLORS.bg, color: COLORS.ink }}>
 
-        {/* Хлебные крошки */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-4 md:mb-6 overflow-x-auto whitespace-nowrap pb-1">
-          <Link to="/" className="hover:text-white transition">Главная</Link>
-          <i className="fas fa-chevron-right text-[9px]"></i>
-          <Link to="/catalog" className="hover:text-white transition">Каталог</Link>
-          <i className="fas fa-chevron-right text-[9px]"></i>
-          <span className="text-white truncate">{product.name}</span>
+      {/* ===== DESKTOP VERSION ===== */}
+      <div className="hidden lg:block">
+        <div className="max-w-[1920px] mx-auto px-8 pt-4 pb-4">
+          <div className="flex items-center gap-2 text-[10px] tracking-wider" style={{ fontFamily: 'JetBrains Mono, monospace', color: COLORS.inkFaint }}>
+            <Link to="/" className="hover:text-stamp transition" style={{ color: COLORS.inkFaint }}>ГЛАВНАЯ</Link>
+            <span>/</span>
+            <Link to="/catalog" className="hover:text-stamp transition" style={{ color: COLORS.inkFaint }}>КАТАЛОГ</Link>
+            <span>/</span>
+            <span style={{ color: COLORS.inkSoft }}>{product.name.toUpperCase()}</span>
+          </div>
         </div>
 
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-6 md:gap-8 lg:gap-12">
+        <div className="max-w-[1920px] mx-auto px-8">
+          <div className="flex gap-12">
 
-          {/* ========== ЛЕВАЯ КОЛОНКА - ФОТО ========== */}
-          <div className="relative">
-            {/* Основное фото */}
-            <div
-              onClick={() => openImageViewer(selectedImageIndex)}
-              className="group cursor-pointer"
-            >
-              <div className="max-w-[400px] md:max-w-[500px] mx-auto">
-                <img
-                  src={currentImage}
-                  alt={product.name}
-                  className="w-full h-auto object-contain rounded-xl transition-opacity duration-300"
-                  style={{
-                    maxHeight: isMobile ? '400px' : '500px',
-                    imageRendering: 'high-quality'
-                  }}
-                  loading="eager"
-                />
-                {/* Оверлей при наведении (только ПК) */}
-                {!isMobile && (
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none rounded-xl">
-                    <div className="bg-white/20 backdrop-blur-md rounded-full p-3">
-                      <i className="fas fa-expand text-white text-xl"></i>
-                    </div>
+            {/* Галерея */}
+            <div className="flex-1">
+              <div className="flex gap-3">
+                {product.images && product.images.length > 1 && (
+                  <div className="flex flex-col gap-2 shrink-0 pt-4">
+                    {product.images.map((img: string, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedImageIndex(idx)}
+                        className="w-16 h-20 overflow-hidden transition-all duration-300 flex-shrink-0"
+                        style={{
+                          border: `2px solid ${selectedImageIndex === idx ? COLORS.stamp : 'transparent'}`,
+                          opacity: selectedImageIndex === idx ? 1 : 0.5,
+                          borderRadius: '4px',
+                        }}
+                      >
+                        <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
                   </div>
                 )}
+
+                <div
+                  className="relative cursor-zoom-in group flex-1"
+                  style={{ height: 'calc(100vh - 150px)', minHeight: '500px', maxHeight: '900px' }}
+                  onClick={() => setIsFullscreen(true)}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={selectedImageIndex}
+                      src={currentImage}
+                      alt={product.name}
+                      className="w-full h-full object-contain select-none"
+                      initial={{ opacity: 0, x: 40 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -40 }}
+                      transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                      loading="eager"
+                      decoding="async"
+                    />
+                  </AnimatePresence>
+
+                  {product.images && product.images.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
+                        style={{ backgroundColor: 'rgba(10, 10, 11, 0.7)', color: COLORS.ink, border: `1px solid ${COLORS.ruleStrong}`, cursor: 'pointer' }}
+                      >
+                        <i className="fas fa-chevron-left text-lg" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
+                        style={{ backgroundColor: 'rgba(10, 10, 11, 0.7)', color: COLORS.ink, border: `1px solid ${COLORS.ruleStrong}`, cursor: 'pointer' }}
+                      >
+                        <i className="fas fa-chevron-right text-lg" />
+                      </button>
+                    </>
+                  )}
+
+                  <div className="absolute bottom-4 right-4 z-20 px-4 py-1.5 rounded-full text-xs tracking-[0.2em]" style={{ backgroundColor: 'rgba(10, 10, 11, 0.7)', color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {selectedImageIndex + 1} / {product.images?.length || 1}
+                  </div>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleFavorite(); }}
+                    className="absolute top-4 right-4 z-20 w-11 h-11 rounded-full flex items-center justify-center transition-all"
+                    style={{ backgroundColor: 'rgba(10, 10, 11, 0.7)', border: `1px solid ${isFavorite ? COLORS.stamp : COLORS.rule}`, color: isFavorite ? COLORS.stamp : COLORS.inkSoft }}
+                  >
+                    <i className={`${isFavorite ? 'fas' : 'far'} fa-heart text-sm`} />
+                  </button>
+
+                  <div className="absolute top-4 left-4 z-20">
+                    <ArchiveStamp lot={product.lot} size={56} />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Миниатюры */}
-            {product.images && product.images.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto pb-1 justify-center">
-                {product.images.map((img: string, idx: number) => (
+            {/* Информация - улучшенная */}
+            <div className="w-[460px] shrink-0">
+              <div className="sticky top-24 space-y-5">
+                <div className="border-b pb-5" style={{ borderColor: COLORS.rule }}>
+                  <p className="text-[10px] tracking-[0.3em] mb-2" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {product.label || 'ARCHIVE LABEL'}
+                  </p>
+                  <h1 className="text-3xl font-black leading-[1.1] tracking-tight" style={{ fontFamily: 'Anton, sans-serif' }}>
+                    {product.name}
+                  </h1>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StarRating rating={Number(averageRating)} size="text-sm" />
+                    <span className="text-sm" style={{ color: COLORS.inkSoft }}>{averageRating}</span>
+                    <span className="text-xs" style={{ color: COLORS.inkFaint }}>({reviews.length})</span>
+                  </div>
+                  <span className="text-xs" style={{ color: COLORS.olive, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {product.condition}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-lg" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold" style={{ fontFamily: 'JetBrains Mono, monospace', color: COLORS.ink }}>
+                      {product.price.toLocaleString()} ₽
+                    </span>
+                    {product.old_price && (
+                      <span className="text-lg line-through" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                        {product.old_price.toLocaleString()} ₽
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-4 mt-2 text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                    <span style={{ color: COLORS.goldLight }}>● {product.stockType === 'instock' ? 'В НАЛИЧИИ' : 'ПОД ЗАКАЗ'}</span>
+                    <span style={{ color: COLORS.inkFaint }}>{product.origin}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs tracking-wider" style={{ color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace' }}>ВЫБЕРИТЕ РАЗМЕР</span>
+                    {isSizeSelected && (
+                      <button onClick={() => setSelectedSize('')} className="text-xs flex items-center gap-1" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+                        <i className="fas fa-times text-[10px]"></i> СБРОСИТЬ
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {product.sizes?.length > 0 ? (
+                      product.sizes.map((size: string) => (
+                        <motion.button
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className="h-12 rounded-lg border transition-all text-sm relative"
+                          style={{
+                            borderColor: selectedSize === size ? COLORS.stamp : COLORS.rule,
+                            backgroundColor: selectedSize === size ? `${COLORS.stamp}20` : 'transparent',
+                            color: selectedSize === size ? COLORS.stamp : COLORS.inkSoft,
+                            fontFamily: 'JetBrains Mono, monospace',
+                          }}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          {size}
+                          {selectedSize === size && (
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: COLORS.stamp, color: COLORS.bg }}>
+                              ✓
+                            </span>
+                          )}
+                        </motion.button>
+                      ))
+                    ) : (
+                      <p className="text-sm col-span-4" style={{ color: COLORS.inkFaint }}>Размеры не указаны</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <button
-                    key={idx}
-                    onClick={() => setSelectedImageIndex(idx)}
-                    className={`relative w-10 h-10 md:w-12 md:h-12 rounded-lg overflow-hidden border-2 transition-all duration-200 flex-shrink-0 ${
-                      selectedImageIndex === idx
-                        ? 'border-white shadow-md'
-                        : 'border-white/20 hover:border-white/50'
-                    }`}
+                    onClick={handleAddToCart}
+                    disabled={!isSizeSelected || addingToCart}
+                    className="w-full h-14 rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider transition-all duration-300"
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      backgroundColor: isSizeSelected ? COLORS.ink : COLORS.bgCard,
+                      color: isSizeSelected ? COLORS.bg : COLORS.inkFaint,
+                      border: `1px solid ${isSizeSelected ? COLORS.ink : COLORS.rule}`,
+                      cursor: isSizeSelected ? 'pointer' : 'not-allowed',
+                    }}
                   >
-                    <img src={img} alt={`Фото ${idx + 1}`} className="w-full h-full object-cover" />
+                    {addingToCart ? (
+                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <i className="fas fa-shopping-bag text-sm" />
+                    )}
+                    {isSizeSelected ? 'ДОБАВИТЬ В КОРЗИНУ' : 'ВЫБЕРИТЕ РАЗМЕР'}
                   </button>
-                ))}
+
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={!isSizeSelected}
+                    className="w-full h-14 rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider transition-all duration-300"
+                    style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      backgroundColor: 'transparent',
+                      color: isSizeSelected ? COLORS.stamp : COLORS.inkFaint,
+                      border: `1px solid ${isSizeSelected ? COLORS.stamp : COLORS.rule}`,
+                      cursor: isSizeSelected ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    <i className="fas fa-bolt text-sm" />
+                    КУПИТЬ СЕЙЧАС
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { icon: 'fa-truck', label: 'ДОСТАВКА', value: 'Бесплатно' },
+                    { icon: 'fa-clock', label: 'СРОКИ', value: product.stockType === 'instock' ? '2-5 дней' : `~${product.preorderDays || 30} дн.` },
+                    { icon: 'fa-shield', label: 'СОСТОЯНИЕ', value: product.condition },
+                    { icon: 'fa-globe', label: 'ГЕОГРАФИЯ', value: product.origin },
+                  ].map((item, idx) => (
+                    <div key={idx} className="p-3 rounded-lg" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <i className={`fas ${item.icon} text-[10px]`} style={{ color: COLORS.stamp }} />
+                        <span className="text-[9px] tracking-wider" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                          {item.label}
+                        </span>
+                      </div>
+                      <span className="text-sm" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <hr style={{ borderColor: COLORS.rule }} />
+
+                <div>
+                  <div className="flex gap-6 border-b" style={{ borderColor: COLORS.rule }}>
+                    {[
+                      { id: 'description', label: 'ОПИСАНИЕ' },
+                      { id: 'sizing', label: 'РАЗМЕРЫ' },
+                      { id: 'reviews', label: `ОТЗЫВЫ (${reviews.length})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className="text-xs tracking-wider pb-3 transition-all relative"
+                        style={{
+                          fontFamily: 'JetBrains Mono, monospace',
+                          color: activeTab === tab.id ? COLORS.stamp : COLORS.inkFaint,
+                        }}
+                      >
+                        {tab.label}
+                        {activeTab === tab.id && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor: COLORS.stamp }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="text-sm leading-relaxed max-h-[220px] overflow-y-auto scrollbar-hide pt-4" style={{ color: COLORS.inkSoft }}>
+                    {activeTab === 'description' && (
+                      <p>{product.description}</p>
+                    )}
+                    {activeTab === 'sizing' && (
+                      <div className="space-y-2">
+                        <p>Доступные размеры: {product.sizes?.join(', ') || 'Не указаны'}</p>
+                        <p>Рекомендуем брать свой обычный размер</p>
+                      </div>
+                    )}
+                    {activeTab === 'reviews' && (
+                      <div className="space-y-4">
+                        {isAuthenticated && !hasReviewed && (
+                          <div className="p-4 rounded-xl" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                            <h4 className="text-sm mb-2" style={{ color: COLORS.ink }}>Оставить отзыв</h4>
+                            <div className="flex gap-1 mb-3">
+                              {[1, 2, 3, 4, 5].map((r) => (
+                                <button key={r} onClick={() => setNewReview({ ...newReview, rating: r })}>
+                                  <i className={`fas fa-star ${r <= newReview.rating ? 'text-amber-400' : 'text-white/20'}`} />
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 mb-3">
+                              {reviewImages.map((img, idx) => (
+                                <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden" style={{ border: `1px solid ${COLORS.rule}` }}>
+                                  <img src={img} alt="Фото" className="w-full h-full object-cover" />
+                                  <button onClick={() => setReviewImages(reviewImages.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs">×</button>
+                                </div>
+                              ))}
+                              <label className="cursor-pointer w-12 h-12 rounded-lg flex items-center justify-center" style={{ border: `1px dashed ${COLORS.ruleStrong}`, color: COLORS.inkFaint }}>
+                                <i className="fas fa-plus text-xs" />
+                                <input type="file" accept="image/*" onChange={handleReviewImageUpload} className="hidden" />
+                              </label>
+                            </div>
+                            <textarea
+                              value={newReview.comment}
+                              onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                              rows={2}
+                              placeholder="Ваш отзыв..."
+                              className="w-full px-3 py-2 rounded-xl text-sm resize-none"
+                              style={{ backgroundColor: COLORS.bg, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, outline: 'none' }}
+                            />
+                            <button
+                              onClick={handleSubmitReview}
+                              disabled={isSubmitting}
+                              className="mt-2 px-5 py-1.5 rounded-full text-sm transition"
+                              style={{ backgroundColor: COLORS.ink, color: COLORS.bg, fontFamily: 'JetBrains Mono, monospace' }}
+                            >
+                              ОТПРАВИТЬ
+                            </button>
+                          </div>
+                        )}
+
+                        {reviews.length === 0 ? (
+                          <p className="text-center py-4" style={{ color: COLORS.inkFaint }}>Нет отзывов</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {reviews.map((r) => (
+                              <div key={r.id} className="p-3 rounded-xl" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                                <div className="flex items-start gap-2">
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: COLORS.bgElevated, color: COLORS.inkSoft }}>
+                                    {r.userName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm" style={{ color: COLORS.ink }}>{r.userName}</span>
+                                      <span className="text-[10px]" style={{ color: COLORS.inkFaint }}>
+                                        {new Date(r.date).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                    <StarRating rating={r.rating} size="text-[8px]" />
+                                    <p className="text-sm mt-1" style={{ color: COLORS.inkSoft }}>{r.comment}</p>
+                                    {r.photos && r.photos.length > 0 && (
+                                      <div className="flex gap-1 mt-1">
+                                        {r.photos.slice(0, 3).map((photo: string, idx: number) => (
+                                          <img key={idx} src={photo} alt="Фото" className="w-8 h-8 rounded-lg object-cover" />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-
-            {/* Кнопка избранного */}
-            <button
-              onClick={handleToggleFavorite}
-              className="absolute top-2 right-2 w-8 h-8 md:w-10 md:h-10 bg-black/70 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-white/30 transition hover:scale-110 z-10 shadow-lg"
-            >
-              <i className={`${isFavorite ? 'fas fa-heart text-red-500 text-sm md:text-lg' : 'far fa-heart text-white text-sm md:text-lg'}`}></i>
-            </button>
+            </div>
           </div>
+        </div>
 
-          {/* ========== ПРАВАЯ КОЛОНКА ========== */}
-          <div>
-            <h1 className="text-xl md:text-3xl font-black text-white mb-2">{product.name}</h1>
-
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex items-center gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <i
-                    key={i}
-                    className={`fas fa-star text-[10px] md:text-sm ${
-                      i < Math.floor(Number(averageRating))
-                        ? 'text-amber-400'
-                        : i < Number(averageRating)
-                        ? 'text-amber-400 opacity-50'
-                        : 'text-gray-600'
-                    }`}
+        {similarProducts.length > 0 && (
+          <div className="max-w-[1920px] mx-auto px-8 pb-20">
+            <div className="border-t pt-12" style={{ borderColor: COLORS.rule }}>
+              <h2 className="text-2xl font-black mb-6" style={{ fontFamily: 'Anton, sans-serif' }}>ПОХОЖИЕ ЛОТЫ</h2>
+              <div className="grid grid-cols-4 gap-4">
+                {similarProducts.map((similar) => (
+                  <ProductCard
+                    key={similar.id}
+                    product={similar}
+                    isFavorite={favoriteSet.has(similar.id)}
+                    onToggleFavorite={(id, e) => {
+                      e.stopPropagation();
+                      dispatch(toggleFavoriteAsync(id));
+                    }}
+                    onAddToCart={(p) => {
+                      dispatch(addToCartAsync({
+                        productId: p.id,
+                        quantity: 1,
+                        size: p.sizes?.[0] || 'M',
+                        product: { id: p.id, name: p.name, price: p.price, image: p.images?.[0] || '', sizes: p.sizes }
+                      }));
+                      toast.success(`${p.name} добавлен в корзину`);
+                    }}
                   />
                 ))}
               </div>
-              <span className="text-[10px] md:text-xs text-gray-500">{averageRating} ({reviews.length})</span>
             </div>
+          </div>
+        )}
+      </div>
 
-            <p className="text-xl md:text-3xl font-black text-white mb-3 md:mb-4">{product.price.toLocaleString()} ₽</p>
+      {/* ===== MOBILE VERSION ===== */}
+      <div className="lg:hidden">
+        <div className="relative h-[50vh] min-h-[350px] max-h-[450px]" style={{ backgroundColor: COLORS.bg }}>
+          <div
+            className="relative w-full h-full flex items-center justify-center"
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              const startX = touch.clientX;
+              const element = e.currentTarget;
+              const onTouchMove = (ev: TouchEvent) => {
+                const currentX = ev.touches[0].clientX;
+                const diff = startX - currentX;
+                if (Math.abs(diff) > 30) {
+                  if (diff > 0) nextImage();
+                  else prevImage();
+                  element.removeEventListener('touchmove', onTouchMove);
+                  element.removeEventListener('touchend', onTouchEnd);
+                }
+              };
+              const onTouchEnd = () => {
+                element.removeEventListener('touchmove', onTouchMove);
+                element.removeEventListener('touchend', onTouchEnd);
+              };
+              element.addEventListener('touchmove', onTouchMove);
+              element.addEventListener('touchend', onTouchEnd);
+            }}
+          >
+            <img
+              src={currentImage}
+              alt={product.name}
+              className="w-full h-full object-contain px-2 select-none"
+              loading="eager"
+              decoding="async"
+              onClick={() => setIsFullscreen(true)}
+            />
+          </div>
 
-            {/* Доставка */}
-            <div className="mb-4 p-3 md:p-4 bg-white/5 rounded-xl border border-white/10">
-              {product.stockType === 'in_stock' ? (
-                <>
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <i className="fas fa-check-circle text-xs md:text-sm"></i>
-                    <span className="font-bold text-xs md:text-sm">В наличии в России</span>
-                  </div>
-                  <p className="text-gray-400 text-[10px] md:text-xs mt-1 md:mt-2">• Доставка по РФ: 2-5 дней<br />• Отправка из Москвы</p>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2 text-orange-400">
-                    <i className="fas fa-ship text-xs md:text-sm"></i>
-                    <span className="font-bold text-xs md:text-sm">Предзаказ из Китая</span>
-                  </div>
-                  <p className="text-gray-400 text-[10px] md:text-xs mt-1 md:mt-2">• Срок доставки: ~{product.preorderDays || 30} дней<br />• Трекинг-номер будет предоставлен</p>
-                </>
+          {product.images && product.images.length > 1 && (
+            <div className="absolute bottom-2 right-2 z-10 px-2 py-0.5 rounded-full text-[8px] tracking-wide" style={{ backgroundColor: 'rgba(10, 10, 11, 0.7)', color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace' }}>
+              {selectedImageIndex + 1} / {product.images?.length}
+            </div>
+          )}
+
+          <button
+            onClick={handleToggleFavorite}
+            className="absolute top-2 right-2 z-20 w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(10, 10, 11, 0.7)', border: `1px solid ${isFavorite ? COLORS.stamp : COLORS.rule}`, color: isFavorite ? COLORS.stamp : COLORS.inkSoft }}
+          >
+            <i className={`${isFavorite ? 'fas' : 'far'} fa-heart text-xs`} />
+          </button>
+        </div>
+
+        {product.images && product.images.length > 1 && (
+          <div className="px-3 py-1.5 overflow-x-auto scrollbar-hide" style={{ borderBottom: `1px solid ${COLORS.rule}` }}>
+            <div className="flex gap-1.5 snap-x">
+              {product.images.map((img: string, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImageIndex(idx)}
+                  className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 transition-all duration-300 border-2 snap-start"
+                  style={{ borderColor: selectedImageIndex === idx ? COLORS.stamp : COLORS.rule, opacity: selectedImageIndex === idx ? 1 : 0.5 }}
+                >
+                  <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Мобильная информация */}
+        <div className="px-4 pt-3 pb-6 space-y-3">
+          <div>
+            <div className="text-[9px] tracking-[0.2em]" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+              {product.label || 'ARCHIVE LABEL'}
+            </div>
+            <h1 className="text-lg font-black leading-[1.2] tracking-tight mt-0.5" style={{ fontFamily: 'Anton, sans-serif' }}>
+              {product.name}
+            </h1>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="text-2xl font-bold" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+              {product.price.toLocaleString()} ₽
+            </div>
+            <div className="flex items-center gap-1">
+              <StarRating rating={Number(averageRating)} size="text-[10px]" />
+              <span className="text-xs" style={{ color: COLORS.inkFaint }}>({reviews.length})</span>
+            </div>
+          </div>
+
+          {/* Размеры - крупные кнопки */}
+          <div className="p-3 rounded-lg" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] tracking-wider" style={{ color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace' }}>
+                ВЫБЕРИТЕ РАЗМЕР
+              </span>
+              {isSizeSelected && (
+                <button onClick={() => setSelectedSize('')} className="text-[10px]" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+                  ✕ СБРОСИТЬ
+                </button>
               )}
             </div>
-
-            {/* Размеры */}
-            <div className="mb-4 md:mb-5">
-              <h3 className="text-white/40 text-[9px] md:text-xs font-bold mb-1 md:mb-2 tracking-wider uppercase">Размер</h3>
-              <div className="flex gap-1.5 md:gap-2 flex-wrap">
-                {product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0 ? (
-                  product.sizes.map((size: string) => (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`w-8 h-8 md:w-10 md:h-10 border text-xs md:text-sm font-bold rounded-xl transition ${
-                        selectedSize === size ? 'border-white bg-white text-black' : 'border-white/20 text-white hover:border-white/50'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-xs">Размеры не указаны</p>
-                )}
-              </div>
-            </div>
-
-            {/* Количество */}
-            <div className="mb-4 md:mb-6">
-              <h3 className="text-white/40 text-[9px] md:text-xs font-bold mb-1 md:mb-2 tracking-wider uppercase">Количество</h3>
-              <div className="flex items-center gap-2 md:gap-3">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-7 h-7 md:w-9 md:h-9 border border-white/20 rounded-xl text-white hover:border-white/50 transition text-sm">-</button>
-                <span className="w-8 md:w-10 text-center font-bold text-white text-sm md:text-base">{quantity}</span>
-                <button onClick={() => setQuantity(quantity + 1)} className="w-7 h-7 md:w-9 md:h-9 border border-white/20 rounded-xl text-white hover:border-white/50 transition text-sm">+</button>
-              </div>
-            </div>
-
-            {/* Кнопки ПК */}
-            <div className="hidden md:flex gap-4 mb-6">
-              <button onClick={handleAddToCart} className="flex-1 bg-white/10 text-white py-3 rounded-xl font-bold text-sm hover:bg-white/20 transition border border-white/10">
-                В КОРЗИНУ
-              </button>
-              <button onClick={handleBuyNow} className="flex-1 bg-white text-black py-3 rounded-xl font-bold text-sm hover:bg-gray-100 transition">
-                КУПИТЬ СЕЙЧАС
-              </button>
-            </div>
-
-            {/* Табы */}
-            <div className="border-t border-white/10 pt-4 md:pt-5">
-              <div className="flex gap-3 md:gap-5 mb-3 md:mb-4 overflow-x-auto">
-                <button onClick={() => setActiveTab('description')} className={`font-bold text-[9px] md:text-xs tracking-wider pb-1 whitespace-nowrap transition ${activeTab === 'description' ? 'text-white border-b border-white' : 'text-white/50'}`}>ОПИСАНИЕ</button>
-                <button onClick={() => setActiveTab('details')} className={`font-bold text-[9px] md:text-xs tracking-wider pb-1 whitespace-nowrap transition ${activeTab === 'details' ? 'text-white border-b border-white' : 'text-white/50'}`}>ХАРАКТЕРИСТИКИ</button>
-                <button onClick={() => setActiveTab('reviews')} className={`font-bold text-[9px] md:text-xs tracking-wider pb-1 whitespace-nowrap transition ${activeTab === 'reviews' ? 'text-white border-b border-white' : 'text-white/50'}`}>ОТЗЫВЫ ({reviews.length})</button>
-              </div>
-
-              <div className="text-gray-400 text-xs md:text-sm leading-relaxed">
-                {activeTab === 'description' && (
-                  <p>{product.description || 'Описание товара отсутствует'}</p>
-                )}
-
-                {activeTab === 'details' && (
-                  <div className="space-y-1 md:space-y-2">
-                    <p className="text-[10px] md:text-sm">• Категория: <span className="text-white/80">{product.category || 'Не указана'}</span></p>
-                    <p className="text-[10px] md:text-sm">• Размеры: <span className="text-white/80">{product.sizes?.join(', ') || 'Не указаны'}</span></p>
-                    <p className="text-[10px] md:text-sm">• Артикул: <span className="text-white/80">#{product.id}</span></p>
-                    {product.colors?.length > 0 && <p className="text-[10px] md:text-sm">• Цвета: <span className="text-white/80">{product.colors.join(', ')}</span></p>}
-                  </div>
-                )}
-
-                {activeTab === 'reviews' && (
-                  <div>
-                    {isAuthenticated && !hasReviewed && (
-                      <div className="mb-4 md:mb-6 p-3 md:p-4 bg-white/5 rounded-xl border border-white/10">
-                        <h4 className="text-white font-bold text-xs md:text-sm mb-2 md:mb-3">Оставить отзыв</h4>
-                        <div className="flex gap-0.5 md:gap-1 mb-2 md:mb-3">
-                          {[1,2,3,4,5].map(r => (
-                            <button key={r} onClick={() => setNewReview({ ...newReview, rating: r })} className="text-base md:text-xl">
-                              <i className={`fas fa-star ${r <= newReview.rating ? 'text-amber-400' : 'text-gray-600'}`}></i>
-                            </button>
-                          ))}
-                        </div>
-                        <div className="mb-2 md:mb-3 flex flex-wrap gap-1 md:gap-2">
-                          {reviewImages.map((img, idx) => (
-                            <div key={idx} className="relative w-10 h-10 md:w-14 md:h-14">
-                              <img src={img} alt="Фото" className="w-full h-full object-cover rounded-lg" />
-                              <button onClick={() => removeReviewImage(idx)} className="absolute -top-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-red-500 text-white rounded-full text-[8px] md:text-xs">×</button>
-                            </div>
-                          ))}
-                          <label className="cursor-pointer bg-white/10 px-2 py-1 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs text-white hover:bg-white/20 transition">
-                            {isUploadingImage ? 'Загрузка...' : '📷 Фото'}
-                            <input type="file" accept="image/*" onChange={handleReviewImageUpload} className="hidden" disabled={isUploadingImage} />
-                          </label>
-                        </div>
-                        <textarea
-                          value={newReview.comment}
-                          onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                          rows={2}
-                          placeholder="Ваш отзыв..."
-                          className="w-full px-2 py-1.5 md:px-3 md:py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 text-xs md:text-sm resize-none mb-2 md:mb-3 focus:border-white/30 focus:outline-none"
-                        />
-                        <button onClick={handleSubmitReview} disabled={isSubmitting} className="bg-white text-black px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold hover:bg-gray-100 transition">
-                          Отправить
-                        </button>
-                      </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {product.sizes?.length > 0 ? (
+                product.sizes.map((size: string) => (
+                  <button
+                    key={size}
+                    onClick={() => setSelectedSize(size)}
+                    className="py-3 text-sm rounded-lg border transition-all relative"
+                    style={{
+                      borderColor: selectedSize === size ? COLORS.stamp : COLORS.rule,
+                      backgroundColor: selectedSize === size ? `${COLORS.stamp}20` : 'transparent',
+                      color: selectedSize === size ? COLORS.stamp : COLORS.inkSoft,
+                      fontFamily: 'JetBrains Mono, monospace',
+                    }}
+                  >
+                    {size}
+                    {selectedSize === size && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px]" style={{ backgroundColor: COLORS.stamp, color: COLORS.bg }}>
+                        ✓
+                      </span>
                     )}
-                    {reviews.length === 0 ? (
-                      <p className="text-gray-500 text-center py-4 md:py-6 text-xs md:text-sm">Нет отзывов</p>
-                    ) : (
-                      <div className="space-y-3 md:space-y-4 max-h-80 md:max-h-96 overflow-y-auto pr-1 md:pr-2">
-                        {reviews.map(r => (
-                          <div key={r.id} className="border-b border-white/10 pb-2 md:pb-3">
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm col-span-4" style={{ color: COLORS.inkFaint }}>Размеры не указаны</p>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={handleAddToCart}
+            disabled={!isSizeSelected || addingToCart}
+            className="w-full h-12 rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider"
+            style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              backgroundColor: isSizeSelected ? COLORS.ink : COLORS.bgCard,
+              color: isSizeSelected ? COLORS.bg : COLORS.inkFaint,
+              border: `1px solid ${isSizeSelected ? COLORS.ink : COLORS.rule}`,
+            }}
+          >
+            {isSizeSelected ? 'ДОБАВИТЬ В КОРЗИНУ' : 'ВЫБЕРИТЕ РАЗМЕР'}
+          </button>
+
+          <div className="flex flex-wrap gap-2 text-[10px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+            <span className="px-2 py-1 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.goldLight }}>
+              ● {product.stockType === 'instock' ? 'В НАЛИЧИИ' : 'ПОД ЗАКАЗ'}
+            </span>
+            <span className="px-2 py-1 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.inkSoft }}>
+              📍 {product.origin}
+            </span>
+            <span className="px-2 py-1 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.olive }}>
+              {product.condition}
+            </span>
+          </div>
+
+          <hr style={{ borderColor: COLORS.rule }} />
+
+          <div>
+            <div className="flex gap-4 border-b" style={{ borderColor: COLORS.rule }}>
+              {[
+                { id: 'description', label: 'ОПИСАНИЕ' },
+                { id: 'reviews', label: `ОТЗЫВЫ (${reviews.length})` },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="text-xs tracking-wider pb-1.5 transition-all"
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    color: activeTab === tab.id ? COLORS.stamp : COLORS.inkFaint,
+                    borderBottom: activeTab === tab.id ? `2px solid ${COLORS.stamp}` : '2px solid transparent',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-2 text-sm leading-relaxed" style={{ color: COLORS.inkSoft }}>
+              {activeTab === 'description' && (
+                <p>{product.description}</p>
+              )}
+              {activeTab === 'reviews' && (
+                <div className="space-y-2">
+                  {isAuthenticated && !hasReviewed && (
+                    <div className="space-y-1.5 p-2.5 rounded-xl" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                      <h4 className="text-xs" style={{ color: COLORS.ink }}>Оставить отзыв</h4>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((r) => (
+                          <button key={r} onClick={() => setNewReview({ ...newReview, rating: r })} className="text-base">
+                            <i className={`fas fa-star ${r <= newReview.rating ? 'text-amber-400' : 'text-white/20'}`} />
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {reviewImages.map((img, idx) => (
+                          <div key={idx} className="relative w-9 h-9 rounded-lg overflow-hidden" style={{ border: `1px solid ${COLORS.rule}` }}>
+                            <img src={img} alt="Фото" className="w-full h-full object-cover" />
+                            <button onClick={() => setReviewImages(reviewImages.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[6px]">×</button>
+                          </div>
+                        ))}
+                        <label className="cursor-pointer w-9 h-9 rounded-lg flex items-center justify-center" style={{ border: `1px dashed ${COLORS.ruleStrong}`, color: COLORS.inkFaint }}>
+                          <i className="fas fa-plus text-[10px]" />
+                          <input type="file" accept="image/*" onChange={handleReviewImageUpload} className="hidden" />
+                        </label>
+                      </div>
+                      <textarea
+                        value={newReview.comment}
+                        onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                        rows={2}
+                        placeholder="Ваш отзыв..."
+                        className="w-full px-2.5 py-1.5 rounded-lg text-xs resize-none"
+                        style={{ backgroundColor: COLORS.bg, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, outline: 'none' }}
+                      />
+                      <button
+                        onClick={handleSubmitReview}
+                        disabled={isSubmitting}
+                        className="px-4 py-1 rounded-full text-xs transition"
+                        style={{ backgroundColor: COLORS.ink, color: COLORS.bg, fontFamily: 'JetBrains Mono, monospace' }}
+                      >
+                        ОТПРАВИТЬ
+                      </button>
+                    </div>
+                  )}
+
+                  {reviews.length === 0 ? (
+                    <p className="text-xs" style={{ color: COLORS.inkFaint }}>Нет отзывов</p>
+                  ) : (
+                    reviews.map((r) => (
+                      <div key={r.id} className="p-2.5 rounded-xl" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                        <div className="flex items-start gap-2">
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: COLORS.bgElevated, color: COLORS.inkSoft }}>
+                            {r.userName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1">
                             <div className="flex justify-between items-center">
-                              <p className="font-bold text-white text-xs md:text-sm">{r.userName}</p>
-                              <p className="text-[9px] md:text-xs text-gray-500">{new Date(r.date).toLocaleDateString()}</p>
+                              <span className="text-[11px]" style={{ color: COLORS.ink }}>{r.userName}</span>
+                              <span className="text-[9px]" style={{ color: COLORS.inkFaint }}>
+                                {new Date(r.date).toLocaleDateString()}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-0.5 mt-0.5 md:mt-1">
-                              {[...Array(5)].map((_, i) => (
-                                <i key={i} className={`fas fa-star text-[8px] md:text-[10px] ${i < r.rating ? 'text-amber-400' : 'text-gray-600'}`}></i>
-                              ))}
-                            </div>
-                            <p className="text-gray-400 text-[10px] md:text-sm mt-1 md:mt-2">{r.comment}</p>
+                            <StarRating rating={r.rating} size="text-[6px]" />
+                            <p className="text-[11px] mt-0.5" style={{ color: COLORS.inkSoft }}>{r.comment}</p>
                             {r.photos && r.photos.length > 0 && (
-                              <div className="flex gap-1 md:gap-2 mt-1 md:mt-2">
-                                {r.photos.map((photo, idx) => (
-                                  <img key={idx} src={photo} alt="Фото" className="w-8 h-8 md:w-10 md:h-10 object-cover rounded" />
+                              <div className="flex gap-1 mt-0.5">
+                                {r.photos.slice(0, 3).map((photo: string, idx: number) => (
+                                  <img key={idx} src={photo} alt="Фото" className="w-7 h-7 rounded-lg object-cover" />
                                 ))}
                               </div>
                             )}
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Похожие товары */}
         {similarProducts.length > 0 && (
-          <div className="mt-10 md:mt-16 pt-6 md:pt-8 border-t border-white/10">
-            <h2 className="text-lg md:text-2xl font-black text-white mb-4 md:mb-6">ПОХОЖИЕ ТОВАРЫ</h2>
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
-              {similarProducts.map((similar: any) => (
-                <Link key={similar.id} to={`/product/${similar.id}`} className="group">
-                  <div className="bg-white/5 rounded-xl aspect-[4/3] overflow-hidden border border-white/10 group-hover:border-white/30 transition">
+          <div className="px-4 pb-6">
+            <h2 className="text-base font-black mb-2" style={{ fontFamily: 'Anton, sans-serif' }}>ПОХОЖИЕ ЛОТЫ</h2>
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 snap-x">
+              {similarProducts.map((similar) => (
+                <Link
+                  key={similar.id}
+                  to={`/product/${similar.id}`}
+                  className="flex-shrink-0 w-[40vw] max-w-[160px] snap-start space-y-1"
+                >
+                  <div className="aspect-[3/4] rounded-xl overflow-hidden" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
                     <img
-                      src={similar.images?.[0] || similar.image || 'https://placehold.co/400x300/1a1a1a/666666'}
+                      src={similar.images?.[0] || similar.image || 'https://placehold.co/400x500/111113/e8e4dd'}
                       alt={similar.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
-                  <p className="text-white font-bold text-[10px] md:text-xs mt-1 md:mt-2 line-clamp-1 group-hover:text-gray-300 transition">{similar.name}</p>
-                  <p className="text-white font-bold text-xs md:text-sm mt-0.5 md:mt-1">{similar.price.toLocaleString()} ₽</p>
+                  <p className="text-[11px] line-clamp-1" style={{ color: COLORS.ink }}>{similar.name}</p>
+                  <p className="text-[11px]" style={{ color: COLORS.inkSoft }}>
+                    {similar.price.toLocaleString()} ₽
+                  </p>
                 </Link>
               ))}
             </div>
@@ -604,90 +1130,72 @@ const ProductPage = () => {
         )}
       </div>
 
-      {/* Мобильные кнопки */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-white/10 p-3 flex gap-3 z-30 md:hidden" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
-        <button onClick={handleAddToCart} className="flex-1 bg-white/10 text-white py-2.5 rounded-xl font-bold text-xs hover:bg-white/20 transition border border-white/10">
-          В корзину
-        </button>
-        <button onClick={handleBuyNow} className="flex-1 bg-white text-black py-2.5 rounded-xl font-bold text-xs hover:bg-gray-100 transition">
-          Купить
-        </button>
-      </div>
-
-      {/* МОДАЛЬНОЕ ОКНО - 4K качество */}
-      {isImageViewerOpen && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center"
-          onClick={closeImageViewer}
-        >
-          <button
-            onClick={closeImageViewer}
-            className="fixed top-4 right-4 w-8 h-8 md:w-10 md:h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition z-10"
+      {/* ===== FULLSCREEN VIEWER ===== */}
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(10, 10, 11, 0.95)' }}
+            onClick={() => setIsFullscreen(false)}
           >
-            <i className="fas fa-times text-white text-sm md:text-xl"></i>
-          </button>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="absolute top-4 right-4 w-12 h-12 rounded-full flex items-center justify-center text-xl"
+              style={{ backgroundColor: COLORS.bgCard, color: COLORS.ink }}
+            >
+              ✕
+            </button>
 
-          {product.images && product.images.length > 1 && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedViewerImage(prev => prev === 0 ? product.images.length - 1 : prev - 1);
-                }}
-                className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 w-8 h-8 md:w-12 md:h-12 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition z-10"
-              >
-                <i className="fas fa-chevron-left text-white text-sm md:text-2xl"></i>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedViewerImage(prev => prev === product.images.length - 1 ? 0 : prev + 1);
-                }}
-                className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 w-8 h-8 md:w-12 md:h-12 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition z-10"
-              >
-                <i className="fas fa-chevron-right text-white text-sm md:text-2xl"></i>
-              </button>
-            </>
-          )}
-
-          <img
-            src={product.images?.[selectedViewerImage] || currentImage}
-            alt={product.name}
-            className="max-w-[95vw] max-h-[85vh] w-auto h-auto object-contain rounded-xl cursor-default"
-            style={{
-              imageRendering: 'high-quality',
-              transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden'
-            }}
-            onClick={(e) => e.stopPropagation()}
-            loading="eager"
-          />
-
-          <div className="absolute bottom-4 left-0 right-0">
-            <div className="flex justify-center gap-1 md:gap-2 overflow-x-auto px-2 md:px-4 py-1 md:py-2">
-              {product.images?.map((img: string, idx: number) => (
+            {product.images && product.images.length > 1 && (
+              <>
                 <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedViewerImage(idx);
-                  }}
-                  className={`w-8 h-8 md:w-12 md:h-12 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
-                    selectedViewerImage === idx ? 'border-white shadow-md' : 'border-white/30 hover:border-white/60'
-                  }`}
+                  onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: COLORS.bgCard, color: COLORS.ink }}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <i className="fas fa-chevron-left" />
                 </button>
-              ))}
+                <button
+                  onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: COLORS.bgCard, color: COLORS.ink }}
+                >
+                  <i className="fas fa-chevron-right" />
+                </button>
+              </>
+            )}
+
+            <motion.img
+              key={selectedImageIndex}
+              src={currentImage}
+              alt={product.name}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="w-[90vw] h-[85vh] object-contain select-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full text-sm" style={{ backgroundColor: COLORS.bgCard, color: COLORS.ink }}>
+              {selectedImageIndex + 1} / {product.images?.length || 1}
             </div>
-            <div className="text-center mt-1 md:mt-2">
-              <span className="bg-black/50 backdrop-blur rounded-full px-2 py-0.5 md:px-3 md:py-1 text-white text-[9px] md:text-xs">
-                {selectedViewerImage + 1} / {product.images?.length || 1}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .cursor-zoom-in { cursor: zoom-in; }
+      `}</style>
     </div>
   );
 };

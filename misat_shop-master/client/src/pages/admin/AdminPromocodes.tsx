@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 interface Promocode {
@@ -139,7 +139,6 @@ const AdminPromocodes = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
@@ -204,7 +203,7 @@ const AdminPromocodes = () => {
                       >
                         {promo.isActive ? 'Активен' : 'Неактивен'}
                       </button>
-                     </td>
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex gap-2">
                         <button onClick={() => openEditModal(promo)} className="text-blue-400 hover:text-blue-300 transition">
@@ -214,8 +213,8 @@ const AdminPromocodes = () => {
                           <i className="fas fa-trash"></i>
                         </button>
                       </div>
-                     </td>
-                   </tr>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -223,7 +222,6 @@ const AdminPromocodes = () => {
         </div>
       )}
 
-      {/* Модальное окно - ТЕМНОЕ */}
       {isModalOpen && (
         <>
           <div className="fixed inset-0 bg-black/80 z-40" onClick={() => setIsModalOpen(false)} />

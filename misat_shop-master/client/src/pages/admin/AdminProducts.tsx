@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { productsAPI, categoriesAPI } from '../../services/api';
+import { productsAPI, categoriesAPI, brandsAPI } from '../../services/api';
 
 interface Product {
   id: number;
@@ -10,6 +10,7 @@ interface Product {
   images: string[];
   description: string;
   category: string;
+  brand?: string;
   sizes: string[];
   colors: string[];
   rating: number;
@@ -28,9 +29,37 @@ interface Category {
   is_active: number;
 }
 
+interface Brand {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  is_active?: number;
+}
+
+// ============================================
+// ЦВЕТОВАЯ ПАЛИТРА — тёмный архив
+// ============================================
+const COLORS = {
+  bg: '#0a0a0b',
+  bgCard: '#111113',
+  bgElevated: '#161619',
+  ink: '#e8e4dd',
+  inkSoft: 'rgba(232, 228, 221, 0.62)',
+  inkFaint: 'rgba(232, 228, 221, 0.38)',
+  stamp: '#b8937a',
+  stampDark: '#8b6f5a',
+  olive: '#7a8a7a',
+  rule: 'rgba(232, 228, 221, 0.08)',
+  ruleStrong: 'rgba(232, 228, 221, 0.15)',
+  gold: '#b8a088',
+  goldLight: '#d4c4b0',
+};
+
 const AdminProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [brandsList, setBrandsList] = useState<Brand[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -38,6 +67,8 @@ const AdminProducts = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [currentSizes, setCurrentSizes] = useState<string[]>([]);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -45,6 +76,7 @@ const AdminProducts = () => {
     oldPrice: '',
     description: '',
     category: '',
+    brand: '',
     sizes: [] as string[],
     colors: [] as string[],
     stock: '',
@@ -54,36 +86,64 @@ const AdminProducts = () => {
     preorderDays: 30
   });
 
-  // Загрузка категорий из БД
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadData = async () => {
       try {
-        const response = await categoriesAPI.getAll();
-        setCategoriesList(response.data || []);
-        if (response.data && response.data.length > 0 && !formData.category) {
-          setFormData(prev => ({ ...prev, category: response.data[0].slug }));
+        const [categoriesRes, brandsRes] = await Promise.all([
+          categoriesAPI.getAll(),
+          brandsAPI.getAll()
+        ]);
+
+        setCategoriesList(categoriesRes.data || []);
+        setBrandsList(brandsRes.data || []);
+
+        if (categoriesRes.data && categoriesRes.data.length > 0) {
+          const firstCat = categoriesRes.data[0];
+          setFormData(prev => ({ ...prev, category: firstCat.slug }));
+        }
+        if (brandsRes.data && brandsRes.data.length > 0) {
+          const firstBrand = brandsRes.data[0];
+          setFormData(prev => ({ ...prev, brand: firstBrand.slug }));
         }
       } catch (error) {
-        console.error('Ошибка загрузки категорий:', error);
+        console.error('Ошибка загрузки данных:', error);
       }
     };
-    loadCategories();
+    loadData();
   }, []);
 
-  const clothesSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-  const shoesSizes = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
-  const accessoriesSizes = ['One size'];
-  const sportSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-
-  const getSizesByCategory = (categorySlug: string): string[] => {
-    const cat = categoriesList.find(c => c.slug === categorySlug);
-    if (!cat) return clothesSizes;
-    switch(cat.name) {
-      case 'Обувь': return shoesSizes;
-      case 'Аксессуары': return accessoriesSizes;
-      case 'Спорт': return sportSizes;
-      default: return clothesSizes;
+  const getSizesByCategoryName = (categoryName: string): string[] => {
+    const name = categoryName.toLowerCase();
+    if (name === 'обувь' || name.includes('обув')) {
+      return ['39', '40', '41', '42', '43', '44', '45', '46'];
     }
+    if (name === 'аксессуары' || name.includes('аксесс') || name.includes('головные') || name.includes('ремни') || name.includes('носки')) {
+      return ['ONE SIZE', 'S/M', 'L/XL'];
+    }
+    if (name === 'брюки' || name.includes('брюк') || name.includes('джинс')) {
+      return ['28', '29', '30', '31', '32', '33', '34', '36', '38'];
+    }
+    if (name === 'пальто' || name.includes('пальто') || name.includes('куртк') || name.includes('пуховик')) {
+      return ['44', '46', '48', '50', '52', '54', '56'];
+    }
+    if (name === 'одежда' || name.includes('одежд') || name.includes('футболк') || name.includes('рубашк') || name.includes('свитер') || name.includes('худи')) {
+      return ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    }
+    return ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  };
+
+  const handleCategoryChange = (categorySlug: string) => {
+    const selectedCat = categoriesList.find(c => c.slug === categorySlug);
+    const categoryName = selectedCat?.name || '';
+    const sizes = getSizesByCategoryName(categoryName);
+
+    setCurrentSizes(sizes);
+    setFormData(prev => ({
+      ...prev,
+      category: categorySlug,
+      sizes: []
+    }));
+    setIsCategoryDropdownOpen(false);
   };
 
   const getCategoryName = (categorySlug: string): string => {
@@ -91,7 +151,11 @@ const AdminProducts = () => {
     return cat ? cat.name : categorySlug;
   };
 
-  // Универсальный парсинг полей (массив из JSON строки или уже массив)
+  const getBrandName = (brandSlug: string): string => {
+    const brand = brandsList.find(b => b.slug === brandSlug);
+    return brand ? brand.name : brandSlug;
+  };
+
   const parseArrayField = (field: any): string[] => {
     if (!field) return [];
     if (Array.isArray(field)) return field;
@@ -106,25 +170,17 @@ const AdminProducts = () => {
     return [];
   };
 
-  useEffect(() => {
-    if (categoriesList.length > 0 && formData.category) {
-      setCurrentSizes(getSizesByCategory(formData.category));
-      setFormData(prev => ({ ...prev, sizes: [] }));
-    }
-  }, [formData.category, categoriesList]);
-
   const colorOptions = [
-    { name: 'Чёрный', value: '#000000', code: 'black' },
-    { name: 'Белый', value: '#FFFFFF', code: 'white' },
+    { name: 'Чёрный', value: '#1a1a1a', code: 'black' },
+    { name: 'Белый', value: '#e8e4dd', code: 'white' },
     { name: 'Серый', value: '#808080', code: 'gray' },
-    { name: 'Синий', value: '#0000FF', code: 'blue' },
-    { name: 'Красный', value: '#FF0000', code: 'red' },
-    { name: 'Зелёный', value: '#00FF00', code: 'green' },
-    { name: 'Жёлтый', value: '#FFFF00', code: 'yellow' },
-    { name: 'Розовый', value: '#FF69B4', code: 'pink' },
-    { name: 'Фиолетовый', value: '#800080', code: 'purple' },
-    { name: 'Оранжевый', value: '#FFA500', code: 'orange' },
-    { name: 'Коричневый', value: '#8B4513', code: 'brown' },
+    { name: 'Бежевый', value: '#d4c4b0', code: 'beige' },
+    { name: 'Коричневый', value: '#8b6f5a', code: 'brown' },
+    { name: 'Синий', value: '#4a6a8a', code: 'blue' },
+    { name: 'Зелёный', value: '#6a8a6a', code: 'green' },
+    { name: 'Красный', value: '#8a4a4a', code: 'red' },
+    { name: 'Жёлтый', value: '#c4b04a', code: 'yellow' },
+    { name: 'Фиолетовый', value: '#7a5a8a', code: 'purple' },
   ];
 
   useEffect(() => {
@@ -157,7 +213,7 @@ const AdminProducts = () => {
     loadProducts();
   }, []);
 
-  const compressImage = (file: File, maxSizeMB: number = 0.5): Promise<string> => {
+  const compressImage = (file: File, maxSizeMB: number = 0.3): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -168,8 +224,8 @@ const AdminProducts = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxWidth = 800;
-          const maxHeight = 800;
+          const maxWidth = 400;
+          const maxHeight = 400;
 
           if (width > height) {
             if (width > maxWidth) {
@@ -188,10 +244,10 @@ const AdminProducts = () => {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
 
-          let quality = 0.8;
+          let quality = 0.6;
           let result = canvas.toDataURL('image/jpeg', quality);
 
-          while (result.length > maxSizeMB * 1024 * 1024 && quality > 0.3) {
+          while (result.length > maxSizeMB * 1024 * 1024 && quality > 0.2) {
             quality -= 0.1;
             result = canvas.toDataURL('image/jpeg', quality);
           }
@@ -225,7 +281,7 @@ const AdminProducts = () => {
           continue;
         }
 
-        const compressed = await compressImage(file, 0.5);
+        const compressed = await compressImage(file, 0.3);
         newImages.push(compressed);
       }
 
@@ -257,22 +313,10 @@ const AdminProducts = () => {
   };
 
   const handleAddProduct = async () => {
-    if (!formData.name) {
-      toast.error('Введите название');
-      return;
-    }
-    if (!formData.price) {
-      toast.error('Введите цену');
-      return;
-    }
-    if (imagePreviews.length === 0) {
-      toast.error('Загрузите хотя бы одно изображение');
-      return;
-    }
-    if (!formData.category) {
-      toast.error('Выберите категорию');
-      return;
-    }
+    if (!formData.name) { toast.error('Введите название'); return; }
+    if (!formData.price) { toast.error('Введите цену'); return; }
+    if (imagePreviews.length === 0) { toast.error('Загрузите хотя бы одно изображение'); return; }
+    if (!formData.category) { toast.error('Выберите категорию'); return; }
 
     try {
       const productData = {
@@ -283,6 +327,7 @@ const AdminProducts = () => {
         images: JSON.stringify(imagePreviews),
         description: formData.description,
         category: formData.category,
+        brand: formData.brand || null,
         sizes: JSON.stringify(formData.sizes),
         colors: JSON.stringify(formData.colors),
         stock: Number(formData.stock) || 0,
@@ -294,7 +339,9 @@ const AdminProducts = () => {
       };
 
       await productsAPI.create(productData);
-      toast.success('Товар добавлен!');
+      toast.success('Товар добавлен!', {
+        style: { background: COLORS.bgCard, color: COLORS.ink, border: `1px solid ${COLORS.ruleStrong}`, borderRadius: '4px', fontFamily: 'JetBrains Mono, monospace' }
+      });
       resetForm();
       setIsModalOpen(false);
       loadProducts();
@@ -305,18 +352,15 @@ const AdminProducts = () => {
   };
 
   const handleEditProduct = async () => {
-    if (!editingProduct) return;
-    if (!formData.name) {
-      toast.error('Введите название');
-      return;
-    }
-    if (!formData.price) {
-      toast.error('Введите цену');
-      return;
-    }
+    if (!editingProduct) { toast.error('Товар не выбран'); return; }
+    if (!formData.name) { toast.error('Введите название'); return; }
+    if (!formData.price) { toast.error('Введите цену'); return; }
 
     try {
-      const finalImages = imagePreviews.length > 0 ? imagePreviews : editingProduct.images;
+      let finalImages = imagePreviews;
+      if (finalImages.length === 0 && editingProduct.images) {
+        finalImages = editingProduct.images;
+      }
 
       const productData = {
         name: formData.name,
@@ -326,23 +370,27 @@ const AdminProducts = () => {
         images: JSON.stringify(finalImages),
         description: formData.description,
         category: formData.category,
+        brand: formData.brand || null,
         sizes: JSON.stringify(formData.sizes),
         colors: JSON.stringify(formData.colors),
-        stock: Number(formData.stock) || editingProduct.stock,
+        stock: Number(formData.stock) || editingProduct.stock || 0,
         is_new: formData.isNew ? 1 : 0,
         is_sale: formData.isSale ? 1 : 0,
-        stockType: formData.stockType,
+        stockType: formData.stockType || 'in_stock',
         preorderDays: formData.stockType === 'preorder' ? formData.preorderDays : null,
         rating: 0
       };
 
       await productsAPI.update(editingProduct.id, productData);
-      toast.success('Товар обновлён!');
+      toast.success('Товар обновлён! ✅', {
+        style: { background: COLORS.bgCard, color: COLORS.ink, border: `1px solid ${COLORS.ruleStrong}`, borderRadius: '4px', fontFamily: 'JetBrains Mono, monospace' }
+      });
+
       resetForm();
       setIsModalOpen(false);
       loadProducts();
     } catch (error: any) {
-      console.error('Ошибка:', error);
+      console.error('Ошибка обновления:', error);
       toast.error(error.response?.data?.error || 'Ошибка обновления товара');
     }
   };
@@ -359,22 +407,24 @@ const AdminProducts = () => {
     }
   };
 
-  // Исправленное открытие модального окна редактирования
   const openEditModal = (product: Product) => {
     setEditingProduct(product);
     setImagePreviews(product.images || []);
-
-    // Преобразуем размеры и цвета в массивы (на случай если пришли строкой)
     const productSizes = parseArrayField(product.sizes);
     const productColors = parseArrayField(product.colors);
 
-    setCurrentSizes(getSizesByCategory(product.category));
+    const selectedCat = categoriesList.find(c => c.slug === product.category);
+    const catName = selectedCat?.name || '';
+    const sizes = getSizesByCategoryName(catName);
+    setCurrentSizes(sizes);
+
     setFormData({
       name: product.name,
       price: product.price.toString(),
       oldPrice: product.oldPrice?.toString() || '',
-      description: product.description,
+      description: product.description || '',
       category: product.category,
+      brand: product.brand || '',
       sizes: productSizes,
       colors: productColors,
       stock: product.stock.toString(),
@@ -387,39 +437,26 @@ const AdminProducts = () => {
   };
 
   const resetForm = () => {
-    if (categoriesList.length > 0) {
-      setCurrentSizes(getSizesByCategory(categoriesList[0]?.slug || 'clothes'));
-      setFormData({
-        name: '',
-        price: '',
-        oldPrice: '',
-        description: '',
-        category: categoriesList[0]?.slug || '',
-        sizes: [],
-        colors: [],
-        stock: '',
-        isNew: false,
-        isSale: false,
-        stockType: 'in_stock',
-        preorderDays: 30
-      });
-    } else {
-      setCurrentSizes(getSizesByCategory('clothes'));
-      setFormData({
-        name: '',
-        price: '',
-        oldPrice: '',
-        description: '',
-        category: '',
-        sizes: [],
-        colors: [],
-        stock: '',
-        isNew: false,
-        isSale: false,
-        stockType: 'in_stock',
-        preorderDays: 30
-      });
-    }
+    const defaultCat = categoriesList.length > 0 ? categoriesList[0].slug : '';
+    const defaultBrand = brandsList.length > 0 ? brandsList[0].slug : '';
+    const defaultName = categoriesList.length > 0 ? categoriesList[0].name : '';
+    const defaultSizes = getSizesByCategoryName(defaultName);
+    setCurrentSizes(defaultSizes);
+    setFormData({
+      name: '',
+      price: '',
+      oldPrice: '',
+      description: '',
+      category: defaultCat,
+      brand: defaultBrand,
+      sizes: [],
+      colors: [],
+      stock: '',
+      isNew: false,
+      isSale: false,
+      stockType: 'in_stock',
+      preorderDays: 30
+    });
     setImagePreviews([]);
     setEditingProduct(null);
   };
@@ -442,28 +479,43 @@ const AdminProducts = () => {
     }
   };
 
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const selectedCategoryObj = categoriesList.find(c => c.slug === formData.category);
+  const selectedBrandObj = brandsList.find(b => b.slug === formData.brand);
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-black">
-      {/* Header */}
+    <div className="p-4 md:p-6 min-h-screen" style={{ backgroundColor: COLORS.bg, color: COLORS.ink }}>
+
+      {/* Заголовок */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-px bg-white/40"></div>
-          <span className="text-gray-500 text-[10px] md:text-[11px] tracking-[0.3em] uppercase font-medium">Управление</span>
+          <div className="w-8 h-px" style={{ backgroundColor: COLORS.stamp }}></div>
+          <span className="text-[10px] tracking-[0.3em] uppercase" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+            УПРАВЛЕНИЕ
+          </span>
         </div>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-white">
+            <h1 className="text-3xl md:text-4xl font-black tracking-tighter" style={{ fontFamily: 'Anton, sans-serif', color: COLORS.ink }}>
               ТОВАРЫ
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Всего товаров: <span className="text-white font-bold text-lg">{products.length}</span>
+            <p className="text-xs mt-1" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+              ВСЕГО: <span className="font-bold" style={{ color: COLORS.ink }}>{products.length}</span>
             </p>
           </div>
           <button
             onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="bg-white text-black px-6 py-2.5 rounded-xl text-xs font-black tracking-wider hover:bg-gray-200 transition-all duration-300 shadow-lg"
+            className="px-6 py-2.5 rounded text-xs font-black tracking-wider transition"
+            style={{
+              backgroundColor: COLORS.ink,
+              color: COLORS.bg,
+              fontFamily: 'JetBrains Mono, monospace',
+              border: `1px solid ${COLORS.ink}`,
+            }}
           >
             <span className="flex items-center gap-2">
               <i className="fas fa-plus text-xs"></i>
@@ -473,36 +525,61 @@ const AdminProducts = () => {
         </div>
       </div>
 
-      {/* Список товаров */}
-      {products.length === 0 ? (
-        <div className="bg-white/5 rounded-2xl p-12 text-center border border-white/10">
-          <div className="w-20 h-20 mx-auto bg-white/10 rounded-2xl flex items-center justify-center mb-4">
-            <i className="fas fa-box-open text-white/30 text-3xl"></i>
+      {/* Поиск */}
+      <div className="relative mb-4">
+        <input
+          type="text"
+          placeholder="Поиск товара..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 text-sm rounded"
+          style={{
+            backgroundColor: COLORS.bgCard,
+            border: `1px solid ${COLORS.rule}`,
+            color: COLORS.ink,
+            fontFamily: 'JetBrains Mono, monospace',
+            outline: 'none',
+          }}
+        />
+        <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: COLORS.inkFaint }}></i>
+      </div>
+
+      {filteredProducts.length === 0 ? (
+        <div className="rounded p-12 text-center" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+          <div className="w-20 h-20 mx-auto rounded flex items-center justify-center mb-4" style={{ backgroundColor: COLORS.bgElevated }}>
+            <i className="fas fa-box-open text-3xl" style={{ color: COLORS.inkFaint }}></i>
           </div>
-          <p className="text-gray-400 text-base font-medium mb-2">Товаров пока нет</p>
-          <p className="text-gray-600 text-sm mb-6">Добавьте первый товар в магазин</p>
-          <button
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="bg-white/10 text-white px-5 py-2 rounded-xl text-sm hover:bg-white/20 transition"
-          >
-            + Добавить товар
-          </button>
+          <p className="text-sm mb-2" style={{ color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace' }}>
+            {searchQuery ? 'НИЧЕГО НЕ НАЙДЕНО' : 'ТОВАРОВ ПОКА НЕТ'}
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
+              className="mt-3 px-4 py-2 rounded text-[10px]"
+              style={{ backgroundColor: COLORS.stamp, color: COLORS.bg, fontFamily: 'JetBrains Mono, monospace' }}
+            >
+              + ДОБАВИТЬ ПЕРВЫЙ ТОВАР
+            </button>
+          )}
         </div>
       ) : isMobile ? (
         <div className="space-y-3">
-          {products.map(product => (
-            <div key={product.id} className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition">
+          {filteredProducts.map(product => (
+            <div key={product.id} className="rounded p-4" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
               <div className="flex gap-4">
-                <img src={product.images?.[0] || 'https://placehold.co/60x60/1a1a1a/666666'} className="w-16 h-16 object-cover rounded-lg" />
+                <img src={product.images?.[0] || 'https://placehold.co/60x60/111113/e8e4dd'} className="w-16 h-16 object-cover rounded" />
                 <div className="flex-1">
-                  <p className="text-white font-bold text-sm mb-1">{product.name}</p>
-                  <p className="text-white/80 text-sm font-semibold">{product.price.toLocaleString()} ₽</p>
-                  <p className="text-gray-500 text-xs mt-1">{getCategoryName(product.category)}</p>
+                  <p className="font-bold text-sm mb-1" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>{product.name}</p>
+                  <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>{product.price.toLocaleString()} ₽</p>
+                  <p className="text-xs mt-1" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>{getCategoryName(product.category)}</p>
+                  {product.brand && (
+                    <p className="text-xs" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>БРЕНД: {getBrandName(product.brand)}</p>
+                  )}
                   <div className="flex gap-4 mt-3">
-                    <button onClick={() => openEditModal(product)} className="text-gray-500 text-sm hover:text-white transition">
+                    <button onClick={() => openEditModal(product)} className="text-sm transition" style={{ color: COLORS.inkFaint }}>
                       <i className="fas fa-pen"></i>
                     </button>
-                    <button onClick={() => handleDeleteProduct(product.id)} className="text-gray-500 text-sm hover:text-red-400 transition">
+                    <button onClick={() => handleDeleteProduct(product.id)} className="text-sm transition" style={{ color: COLORS.inkFaint }}>
                       <i className="fas fa-trash"></i>
                     </button>
                   </div>
@@ -512,49 +589,59 @@ const AdminProducts = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+        <div className="rounded overflow-hidden" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/5">
-                  <th className="px-4 py-4 text-left text-gray-500 text-[10px] font-bold tracking-wider uppercase w-16">Фото</th>
-                  <th className="px-4 py-4 text-left text-gray-500 text-[10px] font-bold tracking-wider uppercase">Название</th>
-                  <th className="px-4 py-4 text-left text-gray-500 text-[10px] font-bold tracking-wider uppercase">Цена</th>
-                  <th className="px-4 py-4 text-left text-gray-500 text-[10px] font-bold tracking-wider uppercase">Категория</th>
-                  <th className="px-4 py-4 text-left text-gray-500 text-[10px] font-bold tracking-wider uppercase">В наличии</th>
-                  <th className="px-4 py-4 text-right text-gray-500 text-[10px] font-bold tracking-wider uppercase w-24"></th>
+              <thead style={{ backgroundColor: COLORS.bgElevated, borderBottom: `1px solid ${COLORS.rule}` }}>
+                <tr className="text-left text-xs font-bold tracking-wider uppercase">
+                  <th className="px-4 py-3 w-16" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Фото</th>
+                  <th className="px-4 py-3" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Название</th>
+                  <th className="px-4 py-3" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Цена</th>
+                  <th className="px-4 py-3" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Категория</th>
+                  <th className="px-4 py-3" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Бренд</th>
+                  <th className="px-4 py-3" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>В наличии</th>
+                  <th className="px-4 py-3 text-right w-24" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}></th>
                 </tr>
               </thead>
               <tbody>
-                {products.map(product => (
-                  <tr key={product.id} className="border-b border-white/5 hover:bg-white/5 transition">
+                {filteredProducts.map(product => (
+                  <tr key={product.id} style={{ borderBottom: `1px solid ${COLORS.rule}` }} className="hover:bg-white/5 transition">
                     <td className="px-4 py-3">
-                      <img src={product.images?.[0] || 'https://placehold.co/40x40/1a1a1a/666666'} className="w-10 h-10 object-cover rounded-lg" />
+                      <img src={product.images?.[0] || 'https://placehold.co/40x40/111113/e8e4dd'} className="w-10 h-10 object-cover rounded" />
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-white font-medium text-sm line-clamp-1">{product.name}</p>
+                      <p className="font-medium text-sm line-clamp-1" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>{product.name}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-white font-bold text-sm">{product.price.toLocaleString()} ₽</p>
+                      <p className="font-bold text-sm" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>{product.price.toLocaleString()} ₽</p>
                       {product.oldPrice && (
-                        <p className="text-gray-500 text-[10px] line-through">{product.oldPrice.toLocaleString()} ₽</p>
+                        <p className="text-[10px] line-through" style={{ color: COLORS.inkFaint }}>{product.oldPrice.toLocaleString()} ₽</p>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-white/10 rounded-lg text-gray-300 text-xs">
+                      <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: COLORS.bg, color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace' }}>
                         {getCategoryName(product.category)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-medium ${product.stock > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {product.stock > 0 ? `${product.stock} шт` : 'Нет'}
+                      {product.brand ? (
+                        <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: COLORS.bg, color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                          {getBrandName(product.brand)}
+                        </span>
+                      ) : (
+                        <span style={{ color: COLORS.inkFaint }}>—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-medium" style={{ color: product.stock > 0 ? COLORS.olive : '#8a4a4a', fontFamily: 'JetBrains Mono, monospace' }}>
+                        {product.stock > 0 ? `${product.stock} ШТ` : 'НЕТ'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => openEditModal(product)} className="text-gray-500 mr-3 hover:text-white transition">
+                      <button onClick={() => openEditModal(product)} className="transition mr-3" style={{ color: COLORS.inkFaint }}>
                         <i className="fas fa-pen text-xs"></i>
                       </button>
-                      <button onClick={() => handleDeleteProduct(product.id)} className="text-gray-500 hover:text-red-400 transition">
+                      <button onClick={() => handleDeleteProduct(product.id)} className="transition" style={{ color: COLORS.inkFaint }}>
                         <i className="fas fa-trash text-xs"></i>
                       </button>
                     </td>
@@ -569,249 +656,194 @@ const AdminProducts = () => {
       {/* Модальное окно */}
       {isModalOpen && (
         <>
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-40" onClick={() => setIsModalOpen(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] overflow-hidden bg-black rounded-2xl border border-white/10 shadow-2xl z-50">
-            {/* Заголовок модалки */}
-            <div className="sticky top-0 bg-black p-5 border-b border-white/10 flex justify-between items-center z-30">
+          <div className="fixed inset-0 backdrop-blur-sm z-40" style={{ backgroundColor: 'rgba(10, 10, 11, 0.9)' }} onClick={() => setIsModalOpen(false)} />
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] overflow-hidden z-50"
+            style={{
+              backgroundColor: COLORS.bg,
+              borderRadius: '4px',
+              border: `1px solid ${COLORS.ruleStrong}`,
+              boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div className="sticky top-0 p-5 flex justify-between items-center z-30" style={{ backgroundColor: COLORS.bg, borderBottom: `1px solid ${COLORS.rule}` }}>
               <div>
-                <h2 className="text-white font-black text-xl tracking-tight">
-                  {editingProduct ? 'РЕДАКТИРОВАТЬ ТОВАР' : 'НОВЫЙ ТОВАР'}
+                <span className="text-[9px] tracking-[0.2em] block mb-1" style={{ color: COLORS.stamp, fontFamily: 'JetBrains Mono, monospace' }}>
+                  {editingProduct ? 'РЕДАКТИРОВАНИЕ' : 'СОЗДАНИЕ'}
+                </span>
+                <h2 className="text-xl font-black" style={{ fontFamily: 'Anton, sans-serif', color: COLORS.ink }}>
+                  {editingProduct ? 'ИЗМЕНИТЬ ТОВАР' : 'НОВЫЙ ТОВАР'}
                 </h2>
-                <p className="text-gray-500 text-[10px] mt-0.5">
-                  {editingProduct ? 'Измените параметры товара' : 'Заполните информацию о товаре'}
-                </p>
               </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition"
-              >
-                <i className="fas fa-times text-white/60 text-sm"></i>
+              <button onClick={() => setIsModalOpen(false)} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.bgCard, color: COLORS.inkFaint, border: `1px solid ${COLORS.rule}` }}>
+                ✕
               </button>
             </div>
 
-            {/* Контент модалки */}
             <div className="overflow-y-auto max-h-[calc(90vh-80px)] p-6 space-y-6">
-              {/* Фото товара */}
+              {/* Фото */}
               <div>
-                <label className="text-gray-400 text-[10px] font-bold block mb-3 tracking-wider uppercase flex items-center gap-2">
-                  <i className="fas fa-images text-xs"></i>
-                  Фотографии товара
-                  <span className="text-gray-600 text-[8px] font-normal">(первое фото — основное)</span>
+                <label className="text-[10px] font-bold block mb-3 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <i className="fas fa-images text-xs mr-1"></i> ФОТОГРАФИИ
                 </label>
-
-                <div className="flex flex-wrap gap-3 mb-3 p-4 bg-white/5 rounded-xl border border-white/10 min-h-[120px]">
+                <div className="flex flex-wrap gap-3 mb-3 p-4 rounded min-h-[120px]" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
                   {imagePreviews.map((img, idx) => (
                     <div key={idx} className="relative group">
-                      <div className="w-24 h-24 bg-gray-800 rounded-xl overflow-hidden border-2 border-gray-700 group-hover:border-white/40 transition-all duration-200">
+                      <div className="w-24 h-24 rounded overflow-hidden" style={{ backgroundColor: COLORS.bg, border: `2px solid ${COLORS.rule}` }}>
                         <img src={img} className="w-full h-full object-cover" />
                         {idx === 0 && (
-                          <div className="absolute top-0 left-0 bg-gradient-to-r from-white to-gray-200 text-black text-[8px] font-bold px-2 py-0.5 rounded-br-lg z-10 shadow-md">
+                          <div className="absolute top-0 left-0 text-[8px] font-bold px-2 py-0.5 z-10" style={{ backgroundColor: COLORS.stamp, color: COLORS.bg, fontFamily: 'JetBrains Mono, monospace' }}>
                             MAIN
                           </div>
                         )}
                       </div>
-
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 z-20">
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2 z-20" style={{ backgroundColor: 'rgba(10,10,11,0.8)' }}>
                         {idx > 0 && (
-                          <button
-                            onClick={() => moveImageLeft(idx)}
-                            className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/40 transition-all hover:scale-110"
-                            title="Влево"
-                          >
-                            <i className="fas fa-chevron-left text-white text-xs"></i>
+                          <button onClick={() => moveImageLeft(idx)} className="w-8 h-8 rounded-full flex items-center justify-center transition" style={{ backgroundColor: COLORS.bgCard, color: COLORS.ink }}>
+                            <i className="fas fa-chevron-left text-xs"></i>
                           </button>
                         )}
                         {idx < imagePreviews.length - 1 && (
-                          <button
-                            onClick={() => moveImageRight(idx)}
-                            className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/40 transition-all hover:scale-110"
-                            title="Вправо"
-                          >
-                            <i className="fas fa-chevron-right text-white text-xs"></i>
+                          <button onClick={() => moveImageRight(idx)} className="w-8 h-8 rounded-full flex items-center justify-center transition" style={{ backgroundColor: COLORS.bgCard, color: COLORS.ink }}>
+                            <i className="fas fa-chevron-right text-xs"></i>
                           </button>
                         )}
-                        <button
-                          onClick={() => removeImage(idx)}
-                          className="w-8 h-8 bg-red-500/80 rounded-full flex items-center justify-center hover:bg-red-600 transition-all hover:scale-110"
-                          title="Удалить"
-                        >
-                          <i className="fas fa-trash text-white text-xs"></i>
+                        <button onClick={() => removeImage(idx)} className="w-8 h-8 rounded-full flex items-center justify-center transition" style={{ backgroundColor: '#8a4a4a', color: COLORS.ink }}>
+                          <i className="fas fa-trash text-xs"></i>
                         </button>
-                      </div>
-
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[9px] px-2 py-0.5 rounded-full font-medium z-10 backdrop-blur-sm">
-                        {idx + 1}
                       </div>
                     </div>
                   ))}
 
-                  <label className="cursor-pointer w-24 h-24 bg-gray-800 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-600 hover:border-white/40 hover:bg-gray-700 transition-all duration-200 group">
+                  <label className="cursor-pointer w-24 h-24 rounded flex flex-col items-center justify-center border-2 border-dashed transition" style={{ backgroundColor: COLORS.bg, borderColor: COLORS.ruleStrong }}>
                     {isUploading ? (
-                      <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: COLORS.rule, borderTopColor: COLORS.stamp }}></div>
                     ) : (
                       <>
-                        <i className="fas fa-plus text-gray-500 text-xl group-hover:text-white transition"></i>
-                        <span className="text-gray-500 text-[9px] mt-1 group-hover:text-gray-400 transition">Добавить</span>
+                        <i className="fas fa-plus text-xl" style={{ color: COLORS.inkFaint }}></i>
+                        <span className="text-[9px] mt-1" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>ДОБАВИТЬ</span>
                       </>
                     )}
                     <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={isUploading} />
                   </label>
                 </div>
-
-                <p className="text-gray-500 text-[9px] mt-2 flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <i className="fas fa-arrow-left text-[8px]"></i>
-                    <i className="fas fa-arrow-right text-[8px]"></i>
-                    Кнопки для перемещения
-                  </span>
-                  <span className="w-px h-3 bg-gray-700"></span>
-                  <span className="flex items-center gap-1">
-                    <i className="fas fa-trash text-[8px] text-red-400"></i>
-                    Удаление фото
-                  </span>
-                  <span className="w-px h-3 bg-gray-700"></span>
-                  <span className="flex items-center gap-1">
-                    <i className="fas fa-star text-[8px] text-yellow-500"></i>
-                    MAIN — главное фото
-                  </span>
-                </p>
               </div>
 
               {/* Название */}
               <div>
-                <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                  <i className="fas fa-tag text-xs mr-1"></i>
-                  Название товара
+                <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <i className="fas fa-tag text-xs mr-1"></i> НАЗВАНИЕ ТОВАРА
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:border-white/30 focus:outline-none"
+                  className="w-full px-4 py-3 rounded text-sm"
+                  style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
                   placeholder="Введите название товара"
                 />
               </div>
 
-              {/* Цена и старая цена */}
+              {/* Цена */}
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                  <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                    <i className="fas fa-ruble-sign text-xs mr-1"></i>
-                    Цена
+                  <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <i className="fas fa-ruble-sign text-xs mr-1"></i> ЦЕНА
                   </label>
                   <input
                     type="number"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm"
+                    className="w-full px-4 py-3 rounded text-sm"
+                    style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
                     placeholder="0 ₽"
                   />
                 </div>
                 <div>
-                  <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                    <i className="fas fa-percent text-xs mr-1"></i>
-                    Старая цена
+                  <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <i className="fas fa-percent text-xs mr-1"></i> СТАРАЯ ЦЕНА
                   </label>
                   <input
                     type="number"
                     value={formData.oldPrice}
                     onChange={(e) => setFormData({ ...formData, oldPrice: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm"
+                    className="w-full px-4 py-3 rounded text-sm"
+                    style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
                     placeholder="0 ₽"
                   />
                 </div>
               </div>
 
-              {/* Тип товара */}
+              {/* Тип поставки */}
               <div>
-                <label className="text-gray-400 text-[10px] font-bold block mb-3 tracking-wider uppercase">
-                  <i className="fas fa-box text-xs mr-1"></i>
-                  Тип поставки
+                <label className="text-[10px] font-bold block mb-3 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <i className="fas fa-box text-xs mr-1"></i> ТИП ПОСТАВКИ
                 </label>
                 <div className="flex gap-4 flex-wrap">
-                  <label className="flex items-center gap-3 cursor-pointer bg-white/5 px-4 py-3 rounded-xl border border-white/10 hover:bg-white/10 transition">
+                  <label className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${formData.stockType === 'in_stock' ? COLORS.stamp : COLORS.rule}` }}>
                     <input
                       type="radio"
                       name="stockType"
                       value="in_stock"
                       checked={formData.stockType === 'in_stock'}
                       onChange={() => setFormData({ ...formData, stockType: 'in_stock' })}
-                      className="w-4 h-4 accent-white"
+                      className="hidden"
                     />
+                    <span className="w-4 h-4 rounded-full border flex items-center justify-center" style={{ borderColor: formData.stockType === 'in_stock' ? COLORS.stamp : COLORS.rule }}>
+                      {formData.stockType === 'in_stock' && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.stamp }} />}
+                    </span>
                     <div>
-                      <span className="text-white text-sm font-medium">В наличии (РФ)</span>
-                      <p className="text-green-400 text-[9px] mt-0.5">доставка 2-5 дней</p>
+                      <span className="text-sm font-medium" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>В НАЛИЧИИ (РФ)</span>
+                      <p className="text-[9px] mt-0.5" style={{ color: COLORS.olive }}>доставка 2-5 дней</p>
                     </div>
                   </label>
-                  <label className="flex items-center gap-3 cursor-pointer bg-white/5 px-4 py-3 rounded-xl border border-white/10 hover:bg-white/10 transition">
+                  <label className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${formData.stockType === 'preorder' ? COLORS.stamp : COLORS.rule}` }}>
                     <input
                       type="radio"
                       name="stockType"
                       value="preorder"
                       checked={formData.stockType === 'preorder'}
                       onChange={() => setFormData({ ...formData, stockType: 'preorder' })}
-                      className="w-4 h-4 accent-white"
+                      className="hidden"
                     />
+                    <span className="w-4 h-4 rounded-full border flex items-center justify-center" style={{ borderColor: formData.stockType === 'preorder' ? COLORS.stamp : COLORS.rule }}>
+                      {formData.stockType === 'preorder' && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.stamp }} />}
+                    </span>
                     <div>
-                      <span className="text-white text-sm font-medium">Предзаказ (Китай)</span>
-                      <p className="text-orange-400 text-[9px] mt-0.5">доставка 20-35 дней</p>
+                      <span className="text-sm font-medium" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>ПОД ЗАКАЗ (КИТАЙ)</span>
+                      <p className="text-[9px] mt-0.5" style={{ color: COLORS.gold }}>доставка 20-35 дней</p>
                     </div>
                   </label>
                 </div>
               </div>
 
-              {/* Срок предзаказа */}
-              {formData.stockType === 'preorder' && (
-                <div>
-                  <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                    <i className="fas fa-calendar text-xs mr-1"></i>
-                    Срок предзаказа
-                  </label>
-                  <select
-                    value={formData.preorderDays}
-                    onChange={(e) => setFormData({ ...formData, preorderDays: Number(e.target.value) })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:border-white/30 focus:outline-none cursor-pointer appearance-none"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23666'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 1rem center',
-                      backgroundSize: '1rem'
-                    }}
-                  >
-                    <option value={20} className="bg-black text-white">📦 ~20 дней</option>
-                    <option value={25} className="bg-black text-white">📦 ~25 дней</option>
-                    <option value={30} className="bg-black text-white">📦 ~30 дней</option>
-                    <option value={35} className="bg-black text-white">📦 ~35 дней</option>
-                    <option value={40} className="bg-black text-white">📦 ~40 дней</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Категория и количество */}
-              <div className="grid grid-cols-2 gap-5">
+              {/* Категория, Бренд, Количество */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div className="relative">
-                  <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                    <i className="fas fa-folder text-xs mr-1"></i>
-                    Категория
+                  <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <i className="fas fa-folder text-xs mr-1"></i> КАТЕГОРИЯ
                   </label>
                   <button
                     type="button"
                     onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm hover:bg-white/10 transition"
+                    className="w-full flex items-center justify-between px-4 py-3 rounded text-sm transition"
+                    style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}
                   >
-                    <span>{selectedCategoryObj?.name || 'Выберите категорию'}</span>
-                    <i className={`fas fa-chevron-down text-gray-500 text-xs transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`}></i>
+                    <span className="text-left truncate">{selectedCategoryObj?.name || 'Выберите категорию'}</span>
+                    <i className={`fas fa-chevron-down text-xs transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} style={{ color: COLORS.inkFaint }}></i>
                   </button>
                   {isCategoryDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-black border border-white/10 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-2 rounded shadow-2xl z-50 max-h-60 overflow-y-auto" style={{ backgroundColor: COLORS.bg, border: `1px solid ${COLORS.ruleStrong}` }}>
                       {categoriesList.map(cat => (
                         <button
                           key={cat.id}
-                          onClick={() => {
-                            setFormData({ ...formData, category: cat.slug });
-                            setIsCategoryDropdownOpen(false);
+                          onClick={() => handleCategoryChange(cat.slug)}
+                          className="w-full text-left px-4 py-3 text-sm transition"
+                          style={{
+                            backgroundColor: formData.category === cat.slug ? COLORS.bgCard : 'transparent',
+                            color: formData.category === cat.slug ? COLORS.ink : COLORS.inkSoft,
+                            fontFamily: 'JetBrains Mono, monospace',
                           }}
-                          className={`w-full text-left px-4 py-3 text-sm hover:bg-white/10 transition ${formData.category === cat.slug ? 'text-white bg-white/10' : 'text-gray-300'}`}
                         >
                           {cat.name}
                         </button>
@@ -819,16 +851,53 @@ const AdminProducts = () => {
                     </div>
                   )}
                 </div>
+
+                <div className="relative">
+                  <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <i className="fas fa-tag text-xs mr-1"></i> БРЕНД
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded text-sm transition"
+                    style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}
+                  >
+                    <span className="text-left truncate">{selectedBrandObj?.name || 'Выберите бренд'}</span>
+                    <i className={`fas fa-chevron-down text-xs transition-transform ${isBrandDropdownOpen ? 'rotate-180' : ''}`} style={{ color: COLORS.inkFaint }}></i>
+                  </button>
+                  {isBrandDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-2 rounded shadow-2xl z-50 max-h-60 overflow-y-auto" style={{ backgroundColor: COLORS.bg, border: `1px solid ${COLORS.ruleStrong}` }}>
+                      {brandsList.map(brand => (
+                        <button
+                          key={brand.id}
+                          onClick={() => {
+                            setFormData({ ...formData, brand: brand.slug });
+                            setIsBrandDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm transition"
+                          style={{
+                            backgroundColor: formData.brand === brand.slug ? COLORS.bgCard : 'transparent',
+                            color: formData.brand === brand.slug ? COLORS.ink : COLORS.inkSoft,
+                            fontFamily: 'JetBrains Mono, monospace',
+                          }}
+                        >
+                          {brand.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div>
-                  <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                    <i className="fas fa-database text-xs mr-1"></i>
-                    Количество
+                  <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <i className="fas fa-database text-xs mr-1"></i> КОЛИЧЕСТВО
                   </label>
                   <input
                     type="number"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm"
+                    className="w-full px-4 py-3 rounded text-sm"
+                    style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
                     placeholder="0"
                   />
                 </div>
@@ -836,36 +905,45 @@ const AdminProducts = () => {
 
               {/* Размеры */}
               <div>
-                <label className="text-gray-400 text-[10px] font-bold block mb-3 tracking-wider uppercase">
-                  <i className="fas fa-ruler-combined text-xs mr-1"></i>
-                  Размеры
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {currentSizes.map(size => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => handleSizeToggle(size)}
-                      className={`w-12 h-10 rounded-xl text-xs font-semibold transition-all ${
-                        formData.sizes.includes(size)
-                          ? 'bg-white text-black shadow-lg scale-105'
-                          : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
+                <div className="flex justify-between items-center mb-3">
+                  <label className="text-[10px] font-bold tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <i className="fas fa-ruler-combined text-xs mr-1"></i> РАЗМЕРЫ
+                  </label>
+                  <span className="text-[9px]" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                    {selectedCategoryObj?.name || 'Выберите категорию'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 p-4 rounded min-h-[60px]" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}` }}>
+                  {currentSizes.length > 0 ? (
+                    currentSizes.map(size => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => handleSizeToggle(size)}
+                        className="w-12 h-10 rounded text-xs font-semibold transition-all"
+                        style={{
+                          backgroundColor: formData.sizes.includes(size) ? COLORS.ink : COLORS.bg,
+                          color: formData.sizes.includes(size) ? COLORS.bg : COLORS.inkSoft,
+                          border: `1px solid ${formData.sizes.includes(size) ? COLORS.ink : COLORS.rule}`,
+                          fontFamily: 'JetBrains Mono, monospace',
+                        }}
+                      >
+                        {size}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Выберите категорию</p>
+                  )}
                 </div>
                 {formData.sizes.length > 0 && (
-                  <p className="text-gray-500 text-[9px] mt-1">Выбрано: {formData.sizes.join(', ')}</p>
+                  <p className="text-[9px] mt-2" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Выбрано: {formData.sizes.join(', ')}</p>
                 )}
               </div>
 
               {/* Цвета */}
               <div>
-                <label className="text-gray-400 text-[10px] font-bold block mb-3 tracking-wider uppercase">
-                  <i className="fas fa-palette text-xs mr-1"></i>
-                  Цвета
+                <label className="text-[10px] font-bold block mb-3 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <i className="fas fa-palette text-xs mr-1"></i> ЦВЕТА
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {colorOptions.map(color => (
@@ -873,54 +951,61 @@ const AdminProducts = () => {
                       key={color.code}
                       type="button"
                       onClick={() => handleColorToggle(color.code)}
-                      className={`w-9 h-9 rounded-xl border-2 transition-all ${
-                        formData.colors.includes(color.code)
-                          ? 'ring-2 ring-white ring-offset-2 ring-offset-black scale-110 border-white shadow-lg'
-                          : 'border-gray-600 hover:scale-105 hover:border-gray-400'
-                      }`}
-                      style={{ backgroundColor: color.value }}
+                      className="w-9 h-9 rounded-xl border-2 transition-all"
+                      style={{
+                        backgroundColor: color.value,
+                        borderColor: formData.colors.includes(color.code) ? COLORS.stamp : COLORS.rule,
+                        boxShadow: formData.colors.includes(color.code) ? `0 0 0 3px ${COLORS.stamp}40` : 'none',
+                        transform: formData.colors.includes(color.code) ? 'scale(1.1)' : 'scale(1)',
+                      }}
                       title={color.name}
                     />
                   ))}
                 </div>
                 {formData.colors.length > 0 && (
-                  <p className="text-gray-500 text-[10px] mt-2">Выбрано цветов: {formData.colors.length}</p>
+                  <p className="text-[10px] mt-2" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>Выбрано цветов: {formData.colors.length}</p>
                 )}
               </div>
 
               {/* Чекбоксы */}
               <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer bg-white/5 px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/10 transition">
+                <label className="flex items-center gap-2 cursor-pointer px-4 py-2.5 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${formData.isNew ? COLORS.stamp : COLORS.rule}` }}>
+                  <span className="w-4 h-4 rounded border flex items-center justify-center" style={{ borderColor: formData.isNew ? COLORS.stamp : COLORS.rule, backgroundColor: formData.isNew ? COLORS.stamp : 'transparent' }}>
+                    {formData.isNew && <i className="fas fa-check text-[8px]" style={{ color: COLORS.bg }} />}
+                  </span>
                   <input
                     type="checkbox"
                     checked={formData.isNew}
                     onChange={(e) => setFormData({ ...formData, isNew: e.target.checked })}
-                    className="w-4 h-4 accent-white"
+                    className="hidden"
                   />
-                  <span className="text-white text-sm font-medium">NEW</span>
+                  <span className="text-sm" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>NEW</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-white/5 px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/10 transition">
+                <label className="flex items-center gap-2 cursor-pointer px-4 py-2.5 rounded" style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${formData.isSale ? COLORS.stamp : COLORS.rule}` }}>
+                  <span className="w-4 h-4 rounded border flex items-center justify-center" style={{ borderColor: formData.isSale ? COLORS.stamp : COLORS.rule, backgroundColor: formData.isSale ? COLORS.stamp : 'transparent' }}>
+                    {formData.isSale && <i className="fas fa-check text-[8px]" style={{ color: COLORS.bg }} />}
+                  </span>
                   <input
                     type="checkbox"
                     checked={formData.isSale}
                     onChange={(e) => setFormData({ ...formData, isSale: e.target.checked })}
-                    className="w-4 h-4 accent-white"
+                    className="hidden"
                   />
-                  <span className="text-white text-sm font-medium">SALE</span>
+                  <span className="text-sm" style={{ color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace' }}>SALE</span>
                 </label>
               </div>
 
               {/* Описание */}
               <div>
-                <label className="text-gray-400 text-[10px] font-bold block mb-2 tracking-wider uppercase">
-                  <i className="fas fa-align-left text-xs mr-1"></i>
-                  Описание
+                <label className="text-[10px] font-bold block mb-2 tracking-wider uppercase" style={{ color: COLORS.inkFaint, fontFamily: 'JetBrains Mono, monospace' }}>
+                  <i className="fas fa-align-left text-xs mr-1"></i> ОПИСАНИЕ
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={4}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm resize-none"
+                  className="w-full px-4 py-3 rounded text-sm resize-none"
+                  style={{ backgroundColor: COLORS.bgCard, border: `1px solid ${COLORS.rule}`, color: COLORS.ink, fontFamily: 'JetBrains Mono, monospace', outline: 'none' }}
                   placeholder="Подробное описание товара..."
                 />
               </div>
@@ -930,15 +1015,17 @@ const AdminProducts = () => {
                 <button
                   onClick={editingProduct ? handleEditProduct : handleAddProduct}
                   disabled={isUploading}
-                  className="flex-1 bg-white text-black py-3 rounded-xl text-xs font-black tracking-wider hover:bg-gray-200 transition shadow-lg disabled:opacity-50"
+                  className="flex-1 py-3 rounded text-xs font-black tracking-wider transition disabled:opacity-50"
+                  style={{ backgroundColor: COLORS.ink, color: COLORS.bg, fontFamily: 'JetBrains Mono, monospace', border: `1px solid ${COLORS.ink}` }}
                 >
-                  {editingProduct ? 'СОХРАНИТЬ' : 'ДОБАВИТЬ'}
+                  {editingProduct ? '💾 СОХРАНИТЬ' : '➕ ДОБАВИТЬ'}
                 </button>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-3 border border-white/20 rounded-xl text-xs text-gray-400 font-medium hover:text-white hover:border-white/30 transition"
+                  className="px-6 py-3 rounded text-xs font-medium transition"
+                  style={{ backgroundColor: 'transparent', color: COLORS.inkSoft, fontFamily: 'JetBrains Mono, monospace', border: `1px solid ${COLORS.rule}` }}
                 >
-                  ОТМЕНА
+                  ❌ ОТМЕНА
                 </button>
               </div>
             </div>
